@@ -30,37 +30,39 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
 
 For the exporter to function correctly, you need to configure three variables through `juju config`:
 1. **script_file**: with the current implementation, you can only pass a single script for the exporter to execute; your script could be as straightforward as:
-  ```sh
-  #!/bin/sh
-  echo "hello_world{param=\"$1\"} 1"
-  ```
-  This script is stored on disk at the `/etc/script` path.  
-  You can find inspiration by looking at the [official examples](https://github.com/ricoberger/script_exporter/tree/main/examples).
+    ```sh
+    #!/bin/sh
+    echo "hello_world{param=\"$1\"} 1"
+    ```
+    This script is stored on disk at the `/etc/script` path.  
+    You can find inspiration by looking at the [official examples](https://github.com/ricoberger/script_exporter/tree/main/examples).
+
 2. **config_file**: this is the configuration for the Script Exporter itself; here is where you define which scripts the exporter should be able to execute and how they're called. An example configuration file is:
-  ```yaml
-  scripts:
-    - name: hello # Name of the script, arbitrary
-      command: /etc/script # any available shell command, or `/etc/script` for the custom one
-      args:
-        - argument # args to pass to the script
-  ```
-  Please note that if you want to run the script you passed through `juju config`, the **command** must be set to `/etc/script`. 
-  This configuration file will be saved to `/etc/script-exporter.yaml`.  
-  More details on how to write this configuration file can be found in the [official docs](https://github.com/ricoberger/script_exporter/tree/main#usage-and-configuration).
+    ```yaml
+    scripts:
+      - name: hello # Name of the script, arbitrary
+        command: /etc/script # any available shell command, or `/etc/script` for the custom one
+        args:
+          - argument # args to pass to the script
+    ```
+    Please note that if you want to run the script you passed through `juju config`, the **command** must be set to `/etc/script`. 
+    This configuration file will be saved to `/etc/script-exporter.yaml`.  
+    More details on how to write this configuration file can be found in the [official docs](https://github.com/ricoberger/script_exporter/tree/main#usage-and-configuration).
+
 3. **prometheus_config_file**: this specifies the scrape jobs to finally execute the scripts; an example would be:
-  ```yaml
-  scrape_configs:
-    - job_name: 'script_helloworld' # job name, arbitrary
-      metrics_path: /probe
-      params:
-        script: [hello] # the name of the script as specified in the *config_file*
-        prefix: [script] # a custom prefix for this metric
-      static_configs:
-        - targets:
-          - 127.0.0.1
-  ```
-  The `relabel_configs` section will be overwritten by the charm, so it's optional.  
-  For more details on this configuration, refer to the [official documentation](https://github.com/ricoberger/script_exporter/tree/main#prometheus-configuration).
+    ```yaml
+    scrape_configs:
+      - job_name: 'script_helloworld' # job name, arbitrary
+        metrics_path: /probe
+        params:
+          script: [hello] # the name of the script as specified in the *config_file*
+          prefix: [script] # a custom prefix for this metric
+        static_configs:
+          - targets:
+            - 127.0.0.1
+    ```
+    The `relabel_configs` section will be overwritten by the charm, so it's optional.  
+    For more details on this configuration, refer to the [official documentation](https://github.com/ricoberger/script_exporter/tree/main#prometheus-configuration).
 
 ### Environments with no internet access
 
