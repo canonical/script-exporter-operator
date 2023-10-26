@@ -1,0 +1,22 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+options:
+  config_file:
+    default: ""
+    type: string
+    description: |
+      Script exporter configuration file.
+      Refer to https://github.com/ricoberger/script_exporter#usage-and-configuration
+      for full details.
+  prometheus_config_file:
+    default: ""
+    type: string
+    description: |
+      Scrape config for Prometheus in a file.
+      Refer to https://github.com/ricoberger/script_exporter#prometheus-configuration
+      for full details.
+  script_file:
+    default: ""
+    type: string
+    description: Single script file for the exporter to execute.
