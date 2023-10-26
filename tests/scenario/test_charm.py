@@ -1,7 +1,7 @@
 import json
+from unittest.mock import MagicMock, patch
 
 import charm
-from unittest.mock import patch, MagicMock
 from scenario import Context, Relation, State
 
 EXAMPLE_SCRIPT = """#!/bin/bash
@@ -31,6 +31,7 @@ PROMETHEUS_CONFIG = """scrape_configs:
         replacement: ping
 """
 
+
 @patch("charm.service_restart", MagicMock(return_value=True))
 def test_status_no_script():
     context = Context(charm_type=charm.ScriptExporterCharm)
@@ -38,12 +39,17 @@ def test_status_no_script():
     state_out = context.run(event="config-changed", state=state)
     assert state_out.unit_status.name == "blocked"
 
+
 def test_cos_agent_relation_data_is_set():
     cos_agent_relation = Relation("cos-agent", remote_app_name="grafana-agent")
     context = Context(charm_type=charm.ScriptExporterCharm)
     state = State(
         relations=[cos_agent_relation],
-        config={"config_file": EXAMPLE_CONFIG, "script_file": EXAMPLE_SCRIPT, "prometheus_config_file": PROMETHEUS_CONFIG},
+        config={
+            "config_file": EXAMPLE_CONFIG,
+            "script_file": EXAMPLE_SCRIPT,
+            "prometheus_config_file": PROMETHEUS_CONFIG,
+        },
     )
     state_out = context.run(event=cos_agent_relation.changed_event, state=state)
 

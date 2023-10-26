@@ -40,8 +40,8 @@ class ScriptExporterCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._script_path = "/etc/script"
-        self._config_path = "/etc/script-exporter.yaml"
+        self._script_path = "/etc/script-exporter-script"
+        self._config_path = "/etc/script-exporter-config.yaml"
         self._binary_path = "/usr/local/bin/script_exporter"
         self._binary_resource_name = "script-exporter-binary"
 
