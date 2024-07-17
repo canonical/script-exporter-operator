@@ -36,6 +36,3 @@ provides:
   cos-agent:
     interface: cos_agent
     limit: 1
-
-series:
-  - jammy
