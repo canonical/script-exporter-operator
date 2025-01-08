@@ -1,8 +1,9 @@
 import json
 from unittest.mock import MagicMock, patch
 
-import charm
 from scenario import Context, Relation, State
+
+import charm
 
 EXAMPLE_SCRIPT = """#!/bin/bash
 

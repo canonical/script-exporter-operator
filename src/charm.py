@@ -93,9 +93,9 @@ class ScriptExporterCharm(ops.CharmBase):
     def on_config_changed(self, event: ops.ConfigChangedEvent):
         """Handle config changed event."""
         if self.model.config["config_file"]:
-            self.write_file(self._config_path, self.model.config["config_file"])
+            self.write_file(self._config_path, str(self.model.config["config_file"]))
         if self.model.config["script_file"]:
-            self.write_file(self._script_path, self.model.config["script_file"])
+            self.write_file(self._script_path, str(self.model.config["script_file"]))
             os.chmod(self._script_path, 0o755)
         service_restart("script-exporter.service")
         self.set_status()
@@ -132,7 +132,7 @@ class ScriptExporterCharm(ops.CharmBase):
     def scripts_scraping_jobs(self):
         """The scraping jobs to execute scripts from Prometheus."""
         jobs = []
-        prometheus_scrape_jobs = self.model.config.get("prometheus_config_file")
+        prometheus_scrape_jobs = str(self.model.config.get("prometheus_config_file"))
         if prometheus_scrape_jobs:
             scrape_jobs = yaml.safe_load(prometheus_scrape_jobs)
             # Add the Script Exporter's `relabel_configs` to each job
@@ -142,7 +142,7 @@ class ScriptExporterCharm(ops.CharmBase):
                 scrape_job["relabel_configs"] = [
                     {"source_labels": ["__address__"], "target_label": "__param_target"},
                     {"source_labels": ["__param_target"], "target_label": "instance"},
-                    # Copy the scrape job target to an extra label for dahsboard usage
+                    # Copy the scrape job target to an extra label for dashboard usage
                     {"source_labels": ["__param_target"], "target_label": "script_target"},
                     # Set the address to scrape to the script exporter url
                     {
