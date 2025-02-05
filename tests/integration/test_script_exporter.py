@@ -1,7 +1,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from juju.errors import JujuError
@@ -28,7 +28,6 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
     await ops_test.model.integrate("script-exporter", principal.name)
-
 
     await ops_test.model.applications["script-exporter"].set_config(
         {
