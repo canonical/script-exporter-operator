@@ -44,6 +44,7 @@ class ScriptExporterCharm(ops.CharmBase):
         self._config_path = "/etc/script-exporter-config.yaml"
         self._binary_path = "/usr/local/bin/script_exporter"
         self._binary_resource_name = "script-exporter-binary"
+        self._script_daemon_service = Path("/etc/systemd/system/script-exporter.service")
 
         self.cos_agent = COSAgentProvider(
             charm=self,
@@ -93,6 +94,7 @@ class ScriptExporterCharm(ops.CharmBase):
     def on_config_changed(self, event: ops.ConfigChangedEvent):
         """Handle config changed event."""
         if self.model.config["config_file"]:
+            self._create_systemd_service()
             self.write_file(self._config_path, str(self.model.config["config_file"]))
         if self.model.config["script_file"]:
             self.write_file(self._script_path, str(self.model.config["script_file"]))
@@ -156,10 +158,10 @@ class ScriptExporterCharm(ops.CharmBase):
 
     # Methods around getting the Script Exporter binary
 
-    def _create_service_if_not_existing(self) -> None:
-        """Create the systemd service for the exporter if missing."""
+    def _create_systemd_service(self) -> None:
+        """Create the systemd service for the custom exporter."""
         systemd_template = textwrap.dedent(
-            """
+            f"""
             [Unit]
             Description=Prometheus Script exporter
             Wants=network-online.target
@@ -168,7 +170,7 @@ class ScriptExporterCharm(ops.CharmBase):
             [Service]
             LimitNPROC=infinity
             LimitNOFILE=infinity
-            ExecStart=/usr/local/bin/script_exporter --config.file=/etc/script-exporter.yaml
+            ExecStart={self._binary_path} --config.file={self._config_path}
             Restart=always
 
             [Install]
@@ -176,8 +178,7 @@ class ScriptExporterCharm(ops.CharmBase):
             """
         )
 
-        with open("/etc/systemd/system/script-exporter.service", "w") as f:
-            f.write(systemd_template)
+        self._script_daemon_service.write_text(systemd_template)
 
         daemon_reload()
         service_restart("script-exporter.service")
