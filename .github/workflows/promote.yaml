@@ -17,4 +17,5 @@ jobs:
     uses: canonical/observability/.github/workflows/charm-promote.yaml@v0
     with:
       promotion: ${{ github.event.inputs.promotion }}
+      provider: machine
     secrets: inherit
