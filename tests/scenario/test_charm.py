@@ -37,7 +37,7 @@ PROMETHEUS_CONFIG = """scrape_configs:
 def test_status_no_script():
     context = Context(charm_type=charm.ScriptExporterCharm)
     state = State(config={"config_file": "", "script_file": "", "prometheus_config_file": ""})
-    state_out = context.run(event="config-changed", state=state)
+    state_out = context.run(context.on.config_changed(), state=state)
     assert state_out.unit_status.name == "blocked"
 
 
@@ -52,7 +52,9 @@ def test_cos_agent_relation_data_is_set():
             "prometheus_config_file": PROMETHEUS_CONFIG,
         },
     )
-    state_out = context.run(event=cos_agent_relation.changed_event, state=state)
+    state_out = context.run(context.on.relation_changed(cos_agent_relation), state=state)
 
-    relation_data = json.loads(state_out.relations[0].local_unit_data["config"])
+    relation_data = json.loads(
+        state_out.get_relation(cos_agent_relation.id).local_unit_data["config"]
+    )
     assert len(relation_data["metrics_scrape_jobs"]) == 2
