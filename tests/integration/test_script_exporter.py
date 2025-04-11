@@ -1,5 +1,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,9 +19,13 @@ PROMETHEUS_CONFIG_FILE = TESTS_INTEGRATION_DIR / "prometheus_config_file.yaml"
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
+    assert ops_test.model
     await ops_test.model.deploy(principal.charm, application_name=principal.name, series="jammy")
 
-    charm = await ops_test.build_charm(".")
+    if charm_file := os.environ.get("CHARM_PATH"):
+        charm = Path(charm_file)
+    else:
+        charm = await ops_test.build_charm(".")
     jammy_charm_path = charm.parent / "script-exporter_ubuntu-22.04-amd64.charm"
 
     await ops_test.model.deploy(
@@ -42,6 +47,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_metrics(ops_test: OpsTest):
+    assert ops_test.model
     unit = ops_test.model.applications["script-exporter"].units[0]
     try:
         metrics = await unit.ssh("curl localhost:9469/probe?script=hello")

@@ -1,11 +1,73 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+name: script-exporter
 type: charm
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
+summary: Prometheus compatible Script exporter.
+description: |
+  Exporter that exposes information gathered from generic Scripts for use by the a Prometheus
+  compatible monitoring system.
+
+links:
+  documentation: https://discourse.charmhub.io/t/script-exporter-docs-index
+  website: https://charmhub.io/script-exporter
+  source: https://github.com/canonical/script-exporter-operator
+  issues: https://github.com/canonical/script-exporter-operator/issues
+
+subordinate: true
+
+platforms:
+  ubuntu@22.04:amd64:
+  ubuntu@24.04:amd64:
+
+parts:
+  charm:
+    source: .
+    plugin: uv
+    build-packages: [git]
+    build-snaps: [astral-uv]
+    override-build: |
+      craftctl default
+      git describe --always > $CRAFT_PART_INSTALL/version
+
+resources:
+  script-exporter-binary:
+    type: file
+    description: Binary for Script Exporter
+    filename: script_exporter
+
+provides:
+  cos-agent:
+    interface: cos_agent
+    optional: true
+    limit: 1
+
+requires:
+  juju-info:
+    interface: juju-info
+    optional: true
+    scope: container
+    description: |
+      `juju-info` provides basic compatibility with all charms.
+      If all you want is /var/log logs and node_exporter metrics,
+      this relation will be enough.
+
+config:
+  options:
+    config_file:
+      default: ""
+      type: string
+      description: |
+        Script exporter configuration file.
+        Refer to https://github.com/ricoberger/script_exporter#usage-and-configuration
+        for full details.
+    prometheus_config_file:
+      default: ""
+      type: string
+      description: |
+        Scrape config for Prometheus in a file.
+        Refer to https://github.com/ricoberger/script_exporter#prometheus-configuration
+        for full details.
+    script_file:
+      default: ""
+      type: string
+      description: Single script file for the exporter to execute.
