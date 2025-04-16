@@ -26,10 +26,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
         charm = Path(charm_file)
     else:
         charm = await ops_test.build_charm(".")
-    jammy_charm_path = charm.parent / "script-exporter_ubuntu-22.04-amd64.charm"
 
     await ops_test.model.deploy(
-        jammy_charm_path, application_name="script-exporter", num_units=0, series="jammy"
+        charm, application_name="script-exporter", num_units=0, series="jammy"
     )
 
     await ops_test.model.integrate("script-exporter", principal.name)
