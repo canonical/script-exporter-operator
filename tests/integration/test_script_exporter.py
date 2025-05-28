@@ -20,7 +20,7 @@ PROMETHEUS_CONFIG_FILE = TESTS_INTEGRATION_DIR / "prometheus_config_file.yaml"
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     assert ops_test.model
-    await ops_test.model.deploy(principal.charm, application_name=principal.name, series="jammy")
+    await ops_test.model.deploy(principal.charm, application_name=principal.name, series="noble")
 
     if charm_file := os.environ.get("CHARM_PATH"):
         charm = Path(charm_file)
@@ -28,7 +28,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
         charm = await ops_test.build_charm(".")
 
     await ops_test.model.deploy(
-        charm, application_name="script-exporter", num_units=0, series="jammy"
+        charm,
+        application_name="script-exporter",
+        num_units=0,
     )
 
     await ops_test.model.integrate("script-exporter", principal.name)
