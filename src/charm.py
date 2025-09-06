@@ -4,9 +4,13 @@
 
 """Charm the application."""
 
+import base64
+import gzip
+import io
 import logging
 import os
 import shutil
+import tarfile
 import textwrap
 from hashlib import sha256
 from pathlib import Path
@@ -30,6 +34,8 @@ from ops.pebble import APIError
 logger = logging.getLogger(__name__)
 
 EXPORTER_PORT = 9469
+
+# TODO: Create a snap for script_exporter
 EXPORTER_BINARY_URL = "https://github.com/ricoberger/script_exporter/releases/download/v2.15.1/script_exporter-linux-amd64"
 EXPORTER_BINARY_SHA = "e7962a9863c015f721e3cec9af24c85e6b93be79ff992230d9d12029c89f456f"
 
@@ -40,8 +46,10 @@ class ScriptExporterCharm(ops.CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._script_path = "/etc/script-exporter-script"
-        self._config_path = "/etc/script-exporter-config.yaml"
+        self._script_exporter_dir = "/etc/script-exporter"
+        self._scripts_dir_path = f"{self._script_exporter_dir}/scripts"
+        self._script_path = f"{self._scripts_dir_path}/script-exporter-script"
+        self._config_path = f"{self._script_exporter_dir}/script-exporter-config.yaml"
         self._binary_path = "/usr/local/bin/script_exporter"
         self._binary_resource_name = "script-exporter-binary"
         self._script_daemon_service = Path("/etc/systemd/system/script-exporter.service")
@@ -52,17 +60,51 @@ class ScriptExporterCharm(ops.CharmBase):
             refresh_events=[self.on.config_changed],
         )
 
-        self.framework.observe(self.on.install, self.on_install)
-        self.framework.observe(self.on.start, self.on_start)
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.config_changed, self.on_config_changed)
 
-    def on_install(self, event: ops.InstallEvent):
+    def _on_install(self, _: ops.InstallEvent):
         """Handle install event."""
+        self._ensure_scripts_dir()
+
         # Create an empty configuration file
         try:
             open(self._config_path, "x")
         except FileExistsError:
             logger.debug("config file already exists; skipping its initialization")
+
+        self._ensure_binary()
+
+    def _on_start(self, _: ops.StartEvent):
+        """Handle start event."""
+        service_restart("script-exporter.service")
+        self.set_status()
+
+    def _on_stop(self, _: ops.StopEvent):
+        """Ensure that script exporter is stopped."""
+        if service_running("script-exporter"):
+            service_stop("script-exporter")
+
+        try:
+            shutil.rmtree(self._script_exporter_dir)
+        except OSError:
+            pass
+
+        try:
+            os.remove(self._binary_path)
+        except FileNotFoundError:
+            pass
+
+    def on_config_changed(self, _: ops.ConfigChangedEvent):
+        """Handle config changed event."""
+        self._set_config_file()
+        self._set_script_files()
+        service_restart("script-exporter.service")
+        self.set_status()
+
+    def _ensure_binary(self) -> None:
         # Make sure the exporter binary is present with a systemd service
         try:
             self._obtain_exporter(exporter_url=EXPORTER_BINARY_URL, binary_sha=EXPORTER_BINARY_SHA)
@@ -71,36 +113,40 @@ class ScriptExporterCharm(ops.CharmBase):
             logger.warning(msg)
             return
 
-    def on_start(self, event: ops.StartEvent):
-        """Handle start event."""
-        service_restart("script-exporter.service")
-        self.set_status()
+    def _ensure_scripts_dir(self) -> None:
+        # Create the scripts directory if it doesn't exist
+        if not os.path.exists(self._scripts_dir_path):
+            os.makedirs(self._scripts_dir_path)
 
-    def on_stop(self, event: ops.StopEvent):
-        """Ensure that script exporter is stopped."""
-        if service_running("script-exporter"):
-            service_stop("script-exporter")
+    def _set_config_file(self) -> None:
+        if not self.model.config["config_file"]:
+            return
 
-        os.remove(self._config_path)
-        try:
-            os.remove(self._script_path)
-        except FileNotFoundError:
-            pass
-        try:
-            os.remove(self._binary_path)
-        except FileNotFoundError:
-            pass
+        self.write_file(self._config_path, str(self.model.config["config_file"]))
+        self._create_systemd_service()
 
-    def on_config_changed(self, event: ops.ConfigChangedEvent):
-        """Handle config changed event."""
-        if self.model.config["config_file"]:
-            self._create_systemd_service()
-            self.write_file(self._config_path, str(self.model.config["config_file"]))
-        if self.model.config["script_file"]:
-            self.write_file(self._script_path, str(self.model.config["script_file"]))
-            os.chmod(self._script_path, 0o755)
-        service_restart("script-exporter.service")
-        self.set_status()
+    def _set_script_files(self) -> None:
+        if compressed_script_files := self.model.config["compressed_script_files"]:
+            data = base64.b64decode(str(compressed_script_files))
+            decompressed = gzip.decompress(data)
+            tar_bytes = io.BytesIO(decompressed)
+
+            with tarfile.open(fileobj=tar_bytes) as tar:
+                tar.extractall(path=self._scripts_dir_path)
+
+            for path in Path(self._scripts_dir_path).rglob("*"):
+                if not path.is_file():
+                    continue
+
+                os.chmod(path, 0o755)
+
+            return
+
+        if not self.model.config["script_file"]:
+            return
+
+        self.write_file(self._script_path, str(self.model.config["script_file"]))
+        os.chmod(self._script_path, 0o755)
 
     def write_file(self, path: Union[str, Path], content: str) -> None:
         """Write content to a file."""
@@ -111,8 +157,8 @@ class ScriptExporterCharm(ops.CharmBase):
         """Calculate and set the unit status."""
         if not self.model.config["config_file"]:
             self.unit.status = ops.BlockedStatus('Please set the "config_file" config variable')
-        if not self.model.config["script_file"]:
-            self.unit.status = ops.BlockedStatus('Please set the "script_file" config variable')
+        if not (self.model.config["script_file"] or self.model.config["compressed_script_files"]):
+            self.unit.status = ops.BlockedStatus('Please set the "script_file" or "compressed_script_files" config variable')
         elif not self.model.config["prometheus_config_file"]:
             self.unit.status = ops.BlockedStatus(
                 'Please set the "prometheus_config_file" config variable'

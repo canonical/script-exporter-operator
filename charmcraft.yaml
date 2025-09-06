@@ -70,3 +70,7 @@ config:
       default: ""
       type: string
       description: Single script file for the exporter to execute.
+    compressed_script_files:
+      default: ""
+      type: string
+      description: Base64 compressed scripts folder
