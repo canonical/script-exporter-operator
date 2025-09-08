@@ -86,11 +86,11 @@ juju deploy script-exporter --resource script-exporter-binary=@./script_exporter
 
 0. Deploy the charm:
 
-```sh
-juju deploy script-exporter
-```
+    ```sh
+    juju deploy script-exporter
+    ```
 
-For the exporter to function correctly, you need to configure three variables through `juju config`:
+    For the exporter to function correctly, you need to configure three variables through `juju config`:
 
 1. **compressed_script_files**: with this option you can pass multiple scripts for the exporter to execute; your scripts could be as straightforward as:
     ```sh
