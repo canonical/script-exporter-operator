@@ -1,5 +1,5 @@
 scripts:
   - name: hello
-    command: /etc/script-exporter-script
+    command: /etc/script-exporter/scripts/script-exporter-script
     args:
       - argument
