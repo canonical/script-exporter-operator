@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 
 EXPORTER_PORT = 9469
 
-# TODO: Create a snap for script_exporter
 EXPORTER_BINARY_URL = "https://github.com/ricoberger/script_exporter/releases/download/v2.15.1/script_exporter-linux-amd64"
 EXPORTER_BINARY_SHA = "e7962a9863c015f721e3cec9af24c85e6b93be79ff992230d9d12029c89f456f"
 
