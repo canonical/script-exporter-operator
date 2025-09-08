@@ -15,15 +15,15 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
 
 #### Single script file
 
-0. Deploy the charm:
+1. Deploy the charm:
 
-```sh
-juju deploy script-exporter
-```
+    ```sh
+    juju deploy script-exporter
+    ```
 
-For the exporter to function correctly, you need to configure three variables through `juju config`:
+    For the exporter to function correctly, you need to configure three variables through `juju config`:
 
-1. **script_file**: with this option you can only pass a single script for the exporter to execute; your script could be as straightforward as:
+2. **script_file**: with this option you can only pass a single script for the exporter to execute; your script could be as straightforward as:
     ```sh
     #!/bin/sh
     echo "hello_world{param=\"$1\"} 1"
@@ -36,7 +36,7 @@ For the exporter to function correctly, you need to configure three variables th
     juju config script-exporter script_file=@script.sh
     ```
 
-2. **config_file**: this is the configuration for the Script Exporter itself; here is where you define which scripts the exporter should be able to execute and how they're called. An example configuration file is:
+3. **config_file**: this is the configuration for the Script Exporter itself; here is where you define which scripts the exporter should be able to execute and how they're called. An example configuration file is:
     ```yaml
     scripts:
       - name: hello # Name of the script, arbitrary
@@ -53,7 +53,7 @@ For the exporter to function correctly, you need to configure three variables th
     juju config script-exporter config_file=@script-exporter.yaml
     ```
 
-3. **prometheus_config_file**: this specifies the scrape jobs to finally execute the scripts; an example would be:
+4. **prometheus_config_file**: this specifies the scrape jobs to finally execute the scripts; an example would be:
     ```yaml
     scrape_configs:
       - job_name: 'script_helloworld' # job name, arbitrary
@@ -73,18 +73,9 @@ For the exporter to function correctly, you need to configure three variables th
     juju config script-exporter prometheus_config_file=@prometheus.yaml
     ```
 
-### Environments with no internet access
-
-The charm will automatically download the `script_exporter` binary from the internet. If your machine can't or you want to pass it locally, simply deploy the charm by passing the `script-exporter-binary` resource to it, as in:
-
-```
-juju deploy script-exporter --resource script-exporter-binary=@./script_exporter
-```
-
-
 #### Multiple script file
 
-0. Deploy the charm:
+1. Deploy the charm:
 
     ```sh
     juju deploy script-exporter
@@ -92,7 +83,7 @@ juju deploy script-exporter --resource script-exporter-binary=@./script_exporter
 
     For the exporter to function correctly, you need to configure three variables through `juju config`:
 
-1. **compressed_script_files**: with this option you can pass multiple scripts for the exporter to execute; your scripts could be as straightforward as:
+2. **compressed_script_files**: with this option you can pass multiple scripts for the exporter to execute; your scripts could be as straightforward as:
     ```sh
     #!/bin/sh
     echo "hello_world{param=\"$1\"} 1"
@@ -110,7 +101,7 @@ juju deploy script-exporter --resource script-exporter-binary=@./script_exporter
     juju config script-exporter compressed_scripts_files=@b64scripts.txt
     ```
 
-2. **config_file**: this is the configuration for the Script Exporter itself; here is where you define which scripts the exporter should be able to execute and how they're called. An example configuration file is:
+3. **config_file**: this is the configuration for the Script Exporter itself; here is where you define which scripts the exporter should be able to execute and how they're called. An example configuration file is:
     ```yaml
     scripts:
       - name: hello
@@ -132,7 +123,7 @@ juju deploy script-exporter --resource script-exporter-binary=@./script_exporter
     juju config script-exporter config_file=@script-exporter.yaml
     ```
 
-3. **prometheus_config_file**: this specifies the scrape jobs to finally execute the scripts; an example would be:
+4. **prometheus_config_file**: this specifies the scrape jobs to finally execute the scripts; an example would be:
     ```yaml
     scrape_configs:
       - job_name: 'script_hello'
