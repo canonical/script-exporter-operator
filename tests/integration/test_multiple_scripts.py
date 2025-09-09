@@ -1,11 +1,12 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-import os
-import tarfile
 import base64
 import io
+import os
+import tarfile
 from pathlib import Path
 from types import SimpleNamespace
+from typing import List
 
 import pytest
 from juju.errors import JujuError
@@ -64,7 +65,7 @@ async def test_metrics(ops_test: OpsTest):
         pytest.fail(f"Failed to collect metrics from the script-exporter: {e.message}")
 
 
-def tar_gz_base64(paths: list[Path]) -> str:
+def tar_gz_base64(paths: List[Path]) -> str:
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for path in paths:
