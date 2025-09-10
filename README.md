@@ -101,17 +101,17 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
     ```yaml
     scripts:
       - name: hello
-        command: /etc/script-exporter/scripts/script1.sh
+        command: script1.sh
         args:
           - diego
 
       - name: bye
-        command: /etc/script-exporter/scripts/script2.sh
+        command: subdir/script2.sh
         args:
           - maradona
     ```
-    Please note that if you want to run the scripts you passed through `juju config`, the **command** must be set to `/etc/script-exporter/scripts/[SCRIPT_FILE]`.
-    This configuration file will be saved to `/etc/script-exporter/script-exporter.yaml`.
+    Note that the scripts you passed through `juju config`, are stored `/etc/script-exporter/scripts/` directory. For instance `script1.sh` is stored in `/etc/script-exporter/scripts/script1.sh` and `subdir/script2.sh` in `/etc/script-exporter/scripts/subdir/script2.sh`.
+    This configuration file will be saved to `/etc/script-exporter/config.yaml`.
     More details on how to write this configuration file can be found in the [official docs](https://github.com/ricoberger/script_exporter/tree/main#usage-and-configuration).
 
 
