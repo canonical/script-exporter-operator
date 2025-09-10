@@ -14,7 +14,7 @@ import tarfile
 import textwrap
 from hashlib import sha256
 from pathlib import Path
-from typing import Union
+from typing import List, Union
 from urllib import request
 from urllib.error import HTTPError
 
@@ -116,7 +116,8 @@ class ScriptExporterCharm(ops.CharmBase):
         if not self.model.config["config_file"]:
             return
 
-        self._write_file(self._config_path, str(self.model.config["config_file"]))
+        config_file = self._insert_full_path_in_command(str(self.model.config["config_file"]))
+        self._write_file(self._config_path, config_file)
         self._create_systemd_service()
 
     def _set_script_files(self) -> None:
@@ -129,6 +130,7 @@ class ScriptExporterCharm(ops.CharmBase):
 
         self._write_file(self._single_script_path, str(self.model.config["script_file"]))
         os.chmod(self._single_script_path, 0o755)
+
 
     def _extract_scripts_archive(self, scripts_archive: str) -> None:
         data = base64.b64decode(str(scripts_archive))
@@ -143,6 +145,23 @@ class ScriptExporterCharm(ops.CharmBase):
                 continue
 
             os.chmod(path, 0o755)
+
+    def _insert_full_path_in_command(self, config: str) -> str:
+        conf_dict = yaml.safe_load(config)
+        scripts_def = conf_dict.get("scripts", [])
+
+        for definition in scripts_def:
+            if definition.get("command", '') not in self._script_names:
+                msg  = f"{definition.get('command', '')} is not part of the uploaded scripts"
+                logger.debug(msg)
+                continue
+
+            if self._single_script_path in self._script_names:
+                continue
+
+            definition["command"] = os.path.join(self._scripts_dir_path, definition["command"])
+
+        return yaml.dump(conf_dict)
 
     def _write_file(self, path: Union[str, Path], content: str) -> None:
         """Write content to a file."""
@@ -177,6 +196,21 @@ class ScriptExporterCharm(ops.CharmBase):
             )
         else:
             self.unit.status = ops.ActiveStatus()
+
+    @property
+    def _script_names(self) -> List[str]:
+        if scripts_archive := self.model.config["scripts_archive"]:
+            data = base64.b64decode(str(scripts_archive))
+            decompressed = lzma.decompress(data)
+            tar_bytes = io.BytesIO(decompressed)
+
+            with tarfile.open(fileobj=tar_bytes) as tar:
+                return tar.getnames()
+
+        if str(self.model.config["script_file"]):
+            return [self._single_script_path]
+
+        return []
 
     @property
     def self_scraping_job(self):
