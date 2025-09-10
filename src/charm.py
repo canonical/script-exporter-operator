@@ -120,20 +120,8 @@ class ScriptExporterCharm(ops.CharmBase):
         self._create_systemd_service()
 
     def _set_script_files(self) -> None:
-        if scripts_archive := self.model.config["scripts_archive"]:
-            data = base64.b64decode(str(scripts_archive))
-            decompressed = lzma.decompress(data)
-            tar_bytes = io.BytesIO(decompressed)
-
-            with tarfile.open(fileobj=tar_bytes) as tar:
-                tar.extractall(path=self._scripts_dir_path)
-
-            for path in Path(self._scripts_dir_path).rglob("*"):
-                if not path.is_file():
-                    continue
-
-                os.chmod(path, 0o755)
-
+        if scripts_archive := str(self.model.config["scripts_archive"]):
+            self._extract_scripts_archive(scripts_archive)
             return
 
         if not self.model.config["script_file"]:
@@ -141,6 +129,20 @@ class ScriptExporterCharm(ops.CharmBase):
 
         self._write_file(self._single_script_path, str(self.model.config["script_file"]))
         os.chmod(self._single_script_path, 0o755)
+
+    def _extract_scripts_archive(self, scripts_archive: str) -> None:
+        data = base64.b64decode(str(scripts_archive))
+        decompressed = lzma.decompress(data)
+        tar_bytes = io.BytesIO(decompressed)
+
+        with tarfile.open(fileobj=tar_bytes) as tar:
+            tar.extractall(path=self._scripts_dir_path)
+
+        for path in Path(self._scripts_dir_path).rglob("*"):
+            if not path.is_file():
+                continue
+
+            os.chmod(path, 0o755)
 
     def _write_file(self, path: Union[str, Path], content: str) -> None:
         """Write content to a file."""
