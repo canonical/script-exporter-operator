@@ -47,8 +47,8 @@ class ScriptExporterCharm(ops.CharmBase):
 
         self._script_exporter_dir = "/etc/script-exporter"
         self._scripts_dir_path = f"{self._script_exporter_dir}/scripts"
-        self._script_path = f"{self._scripts_dir_path}/script-exporter-script"
-        self._config_path = f"{self._script_exporter_dir}/script-exporter-config.yaml"
+        self._single_script_path = "/etc/script-exporter-script"
+        self._config_path = f"{self._script_exporter_dir}/config.yaml"
         self._binary_path = "/usr/local/bin/script_exporter"
         self._binary_resource_name = "script-exporter-binary"
         self._script_daemon_service = Path("/etc/systemd/system/script-exporter.service")
@@ -86,15 +86,9 @@ class ScriptExporterCharm(ops.CharmBase):
         if service_running("script-exporter"):
             service_stop("script-exporter")
 
-        try:
-            shutil.rmtree(self._script_exporter_dir)
-        except OSError:
-            pass
-
-        try:
-            os.remove(self._binary_path)
-        except FileNotFoundError:
-            pass
+        self._remove_file_dir(self._script_exporter_dir)
+        self._remove_file_dir(self._binary_path)
+        self._remove_file_dir(self._single_script_path)
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle config changed event."""
@@ -122,7 +116,7 @@ class ScriptExporterCharm(ops.CharmBase):
         if not self.model.config["config_file"]:
             return
 
-        self.write_file(self._config_path, str(self.model.config["config_file"]))
+        self._write_file(self._config_path, str(self.model.config["config_file"]))
         self._create_systemd_service()
 
     def _set_script_files(self) -> None:
@@ -145,13 +139,29 @@ class ScriptExporterCharm(ops.CharmBase):
         if not self.model.config["script_file"]:
             return
 
-        self.write_file(self._script_path, str(self.model.config["script_file"]))
-        os.chmod(self._script_path, 0o755)
+        self._write_file(self._single_script_path, str(self.model.config["script_file"]))
+        os.chmod(self._single_script_path, 0o755)
 
-    def write_file(self, path: Union[str, Path], content: str) -> None:
+    def _write_file(self, path: Union[str, Path], content: str) -> None:
         """Write content to a file."""
         with open(path, "w") as f:
             f.write(content)
+
+    def _remove_file_dir(self, fd_path: str) -> None:
+        """Remove a file or directory if it exists."""
+        try:
+            if os.path.isdir(fd_path):
+                shutil.rmtree(fd_path, ignore_errors=True)
+            else:
+                os.remove(fd_path)
+        except FileNotFoundError as e:
+            msg = f"file: '{fd_path}' could not be removed - {str(e)}"
+            logger.warning(msg)
+        except OSError as e:
+            msg = f"directory: '{fd_path}' could not be removed - {str(e)}"
+            logger.warning(msg)
+        except Exception as e:
+            logger.error(e)
 
     def set_status(self):
         """Calculate and set the unit status."""
