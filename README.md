@@ -83,7 +83,7 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
 
     For the exporter to function correctly, you need to configure three variables through `juju config`:
 
-2. **compressed_script_files**: with this option you can pass multiple scripts for the exporter to execute; your scripts could be as straightforward as:
+2. **scripts_archive**: with this option you can pass multiple scripts for the exporter to execute; your scripts could be as straightforward as:
     ```sh
     #!/bin/sh
     echo "hello_world{param=\"$1\"} 1"
@@ -94,7 +94,7 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
     In order to pass more than one script you need to compress and encode them in base64 beforehand:
 
     ```shell
-    tar -zc script1.sh script2.sh | base64 > b64scripts.txt
+    tar -c --lzma script1.sh script2.sh | base64 > b64scripts.txt
     ```
 
     ```shell

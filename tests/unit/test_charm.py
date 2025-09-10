@@ -102,12 +102,12 @@ def test_cos_agent_relation_data_is_set_script_file(ctx):
     assert len(relation_data["metrics_scrape_jobs"]) == 2
 
 
-def test_cos_agent_relation_data_is_set_compressed_script_files(ctx):
+def test_cos_agent_relation_data_is_set_scripts_archive(ctx):
     cos_agent_relation = Relation("cos-agent", remote_app_name="grafana-agent")
     state = State(
         relations=[cos_agent_relation],
         config={
-            "compressed_script_files": EXAMPLE_B64_COMPRESSED_SCRIPTS,
+            "scripts_archive": EXAMPLE_B64_COMPRESSED_SCRIPTS,
             "script_file": EXAMPLE_MULTIPLE_CONFIG,
             "prometheus_config_file": PROMETHEUS_MULTIPLE_CONFIG,
         },

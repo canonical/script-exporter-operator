@@ -5,9 +5,9 @@
 """Charm the application."""
 
 import base64
-import gzip
 import io
 import logging
+import lzma
 import os
 import shutil
 import tarfile
@@ -62,7 +62,7 @@ class ScriptExporterCharm(ops.CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
-        self.framework.observe(self.on.config_changed, self.on_config_changed)
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
 
     def _on_install(self, _: ops.InstallEvent):
         """Handle install event."""
@@ -96,8 +96,9 @@ class ScriptExporterCharm(ops.CharmBase):
         except FileNotFoundError:
             pass
 
-    def on_config_changed(self, _: ops.ConfigChangedEvent):
+    def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle config changed event."""
+        self._ensure_scripts_dir()
         self._set_config_file()
         self._set_script_files()
         service_restart("script-exporter.service")
@@ -125,9 +126,9 @@ class ScriptExporterCharm(ops.CharmBase):
         self._create_systemd_service()
 
     def _set_script_files(self) -> None:
-        if compressed_script_files := self.model.config["compressed_script_files"]:
-            data = base64.b64decode(str(compressed_script_files))
-            decompressed = gzip.decompress(data)
+        if scripts_archive := self.model.config["scripts_archive"]:
+            data = base64.b64decode(str(scripts_archive))
+            decompressed = lzma.decompress(data)
             tar_bytes = io.BytesIO(decompressed)
 
             with tarfile.open(fileobj=tar_bytes) as tar:
@@ -156,8 +157,8 @@ class ScriptExporterCharm(ops.CharmBase):
         """Calculate and set the unit status."""
         if not self.model.config["config_file"]:
             self.unit.status = ops.BlockedStatus('Please set the "config_file" config variable')
-        if not (self.model.config["script_file"] or self.model.config["compressed_script_files"]):
-            self.unit.status = ops.BlockedStatus('Please set the "script_file" or "compressed_script_files" config variable')
+        if not (self.model.config["script_file"] or self.model.config["scripts_archive"]):
+            self.unit.status = ops.BlockedStatus('Please set the "script_file" or "scripts_archive" config variable')
         elif not self.model.config["prometheus_config_file"]:
             self.unit.status = ops.BlockedStatus(
                 'Please set the "prometheus_config_file" config variable'

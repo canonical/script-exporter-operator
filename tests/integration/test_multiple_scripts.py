@@ -42,7 +42,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.applications["script-exporter"].set_config(
         {
-            "compressed_script_files": tar_gz_base64([SCRIPT1, SCRIPT2]),
+            "scripts_archive": tar_lzma_base64([SCRIPT1, SCRIPT2]),
             "config_file": CONFIG_FILE.read_text(),
             "prometheus_config_file": PROMETHEUS_CONFIG_FILE.read_text(),
         }
@@ -65,9 +65,9 @@ async def test_metrics(ops_test: OpsTest):
         pytest.fail(f"Failed to collect metrics from the script-exporter: {e.message}")
 
 
-def tar_gz_base64(paths: List[Path]) -> str:
+def tar_lzma_base64(paths: List[Path]) -> str:
     buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+    with tarfile.open(fileobj=buf, mode="w:xz") as tar:
         for path in paths:
             tar.add(path, arcname=path.name)
     buf.seek(0)
