@@ -148,6 +148,64 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
     juju config script-exporter prometheus_config_file=@prometheus.yaml
     ```
 
+
+#### How to compare a config option against their scripts
+
+
+#### `script-exporter` or `prometheus_config_file` configs:
+
+```shell
+$ diff -u script-exporter.yaml <(juju config script-exporter config_file)
+```
+
+```diff
+--- script-exporter.yaml        2025-09-11 08:55:17.000000000 -0300
++++ /proc/self/fd/11    2025-09-11 09:15:32.843467258 -0300
+@@ -5,6 +5,7 @@
+       - diego
+
+   - name: bye
+-    command: my_subdir/script2.sh
++    command: subdir/script2.sh
+     args:
+-      - naradona
++      - maradona
++
+```
+
+```shell
+$ diff -u scrape_config.yaml <(juju config script-exporter prometheus_config_file)
+```
+
+```diff
+--- scrape_config.yaml  2025-09-10 20:30:31.000000000 -0300
++++ /proc/self/fd/11    2025-09-11 09:19:34.813871877 -0300
+@@ -25,3 +25,4 @@
+     static_configs:
+       - targets:
+         - 127.0.0.1
++
+```
+
+#### `scripts_archivoe` config:
+
+```shell
+$ diff -u <(juju config script-exporter scripts_archive | base64 -d | tar --lzma -xOf -) <(cat script1.sh subdir/script2.
+```
+
+```diff
+--- /proc/self/fd/11    2025-09-11 09:16:36.890957265 -0300
++++ /proc/self/fd/13    2025-09-11 09:16:36.891957304 -0300
+@@ -1,4 +1,4 @@
+-#!/bin/sh
++#!/bin/bash
+ echo "hello{param=\"$1\"} 1"
+ #!/bin/sh
+ echo "bye{param=\"$1\"} 1"
+```
+
+
+
 ### Environments with no internet access
 
 The charm will automatically download the `script_exporter` binary from the internet. If your machine can't or you want to pass it locally, simply deploy the charm by passing the `script-exporter-binary` resource to it, as in:
