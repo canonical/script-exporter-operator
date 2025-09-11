@@ -49,12 +49,12 @@ AAAAAMAfuQIhncIHACgAAA==
 
 EXAMPLE_MULTIPLE_CONFIG = """scripts:
   - name: hello
-    command: /etc/script-exporter/scripts/script1.sh
+    command: script1.sh
     args:
       - diego
 
   - name: bye
-    command: /etc/script-exporter/scripts/script2.sh
+    command: script2.sh
     args:
       - maradona
 """
