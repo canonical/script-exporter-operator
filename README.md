@@ -91,7 +91,19 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
     These scripts are stored on disk at the `/etc/script-exporter/scripts/` path.
     You can find inspiration by looking at the [official examples](https://github.com/ricoberger/script_exporter/tree/main/examples).
 
-    In order to pass more than one script you need to compress using LZMA and encode them in base64:
+    In order to pass more than one script, for instance the ones you have in this directory
+
+   ```shell
+    $ tree
+    .
+    ├── script1.sh
+    └── subdir
+        └── script2.sh
+
+    2 directories, 2 files
+    ```
+
+    you need to compress using LZMA and encode them in base64:
 
     ```shell
     juju config script-exporter scripts_archive=@<(tar -c --lzma script1.sh subdir/script2.sh | base64)
