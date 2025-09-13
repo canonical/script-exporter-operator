@@ -5,6 +5,11 @@ scripts:
       - diego
 
   - name: bye
-    command: script2.sh
+    command: subdir/script2.sh
     args:
       - maradona
+
+  - name: abspath
+    command: /usr/bin/echo
+    args:
+      - 'champion{param="me"} 1'

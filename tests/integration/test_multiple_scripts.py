@@ -15,9 +15,9 @@ from pytest_operator.plugin import OpsTest
 principal = SimpleNamespace(charm="ubuntu", name="principal")
 
 TESTS_INTEGRATION_DIR = Path(__file__).parent
-
-SCRIPT1 = TESTS_INTEGRATION_DIR / "script1.sh"
-SCRIPT2 = TESTS_INTEGRATION_DIR / "script2.sh"
+SCRIPTS_DIR = TESTS_INTEGRATION_DIR / "scripts"
+SCRIPT1 = SCRIPTS_DIR/ "script1.sh"
+SCRIPT2 = SCRIPTS_DIR / "subdir" / "script2.sh"
 CONFIG_FILE = TESTS_INTEGRATION_DIR / "config_multiple.yaml"
 PROMETHEUS_CONFIG_FILE = TESTS_INTEGRATION_DIR / "prometheus_config_multiple.yaml"
 
@@ -61,6 +61,9 @@ async def test_metrics(ops_test: OpsTest):
 
         metric_bye = await unit.ssh("curl localhost:9469/probe?script=bye")
         assert 'bye_world{param="maradona"} 1' in metric_bye
+
+        metric_champ = await unit.ssh("curl localhost:9469/probe?script=abspath")
+        assert 'champion{param="me"} 1' in metric_champ
     except JujuError as e:
         pytest.fail(f"Failed to collect metrics from the script-exporter: {e.message}")
 
@@ -69,7 +72,7 @@ def tar_lzma_base64(paths: List[Path]) -> str:
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:xz") as tar:
         for path in paths:
-            tar.add(path, arcname=path.name)
+            arcname = path.relative_to(SCRIPTS_DIR)
+            tar.add(path, arcname=arcname)
     buf.seek(0)
-    # encodear en base64
     return base64.b64encode(buf.read()).decode("utf-8")
