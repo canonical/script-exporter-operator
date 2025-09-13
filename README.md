@@ -202,7 +202,7 @@ $ diff -u scrape_config.yaml <(juju config script-exporter prometheus_config_fil
 #### `scripts_archivoe` config:
 
 ```shell
-$ diff -u <(juju config script-exporter scripts_archive | base64 -d | tar --lzma -xOf -) <(cat script1.sh subdir/script2.
+$ diff -u <(juju config script-exporter scripts_archive | base64 -d | tar --lzma -xOf -) <(cat script1.sh subdir/script2.sh)
 ```
 
 ```diff

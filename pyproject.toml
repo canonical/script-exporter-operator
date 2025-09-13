@@ -9,6 +9,7 @@ dependencies = [
   "ops",
   "cosl",
   "pydantic<2",
+  "charmlibs-pathops",
 ]
 
 [project.optional-dependencies]

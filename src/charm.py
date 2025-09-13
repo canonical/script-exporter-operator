@@ -7,19 +7,20 @@
 import base64
 import io
 import logging
-import lzma
 import os
 import shutil
 import tarfile
 import textwrap
 from hashlib import sha256
+from lzma import LZMAError, decompress
 from pathlib import Path
-from typing import List, Union
+from typing import List
 from urllib import request
 from urllib.error import HTTPError
 
 import ops
 import yaml
+from charmlibs.pathops import LocalPath, PathProtocol
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
@@ -28,6 +29,7 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     service_stop,
 )
+from ops import ActiveStatus, BlockedStatus, StatusBase
 from ops.model import ModelError
 from ops.pebble import APIError
 
@@ -44,13 +46,12 @@ class ScriptExporterCharm(ops.CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-
-        self._script_exporter_dir = "/etc/script-exporter"
-        self._scripts_dir_path = f"{self._script_exporter_dir}/scripts"
-        self._single_script_path = "/etc/script-exporter-script"
-        self._config_path = f"{self._script_exporter_dir}/config.yaml"
-        self._binary_path = "/usr/local/bin/script_exporter"
         self._statuses: List[StatusBase] = []
+        self._script_exporter_dir = LocalPath("/etc/script-exporter")
+        self._scripts_dir_path = LocalPath(f"{self._script_exporter_dir}/scripts")
+        self._single_script_path = LocalPath("/etc/script-exporter-script")
+        self._config_path = LocalPath(f"{self._script_exporter_dir}/config.yaml")
+        self._binary_path = LocalPath("/usr/local/bin/script_exporter")
         self._binary_resource_name = "script-exporter-binary"
         self._script_daemon_service = Path("/etc/systemd/system/script-exporter.service")
 
@@ -70,11 +71,8 @@ class ScriptExporterCharm(ops.CharmBase):
         """Handle install event."""
         self._ensure_scripts_dir()
 
-        # Create an empty configuration file
-        try:
-            open(self._config_path, "x")
-        except FileExistsError:
-            logger.debug("config file already exists; skipping its initialization")
+        if not self._config_path.exists():
+            self._config_path.write_text("")
 
         self._ensure_binary()
 
@@ -93,11 +91,12 @@ class ScriptExporterCharm(ops.CharmBase):
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle config changed event."""
+        self._script_names = self._retrieve_script_names()
         self._ensure_scripts_dir()
         self._set_config_file()
         self._set_script_files()
         service_restart("script-exporter.service")
-        self.set_status()
+
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent) -> None:
         """Calculate and set the unit status."""
         self._statuses.append(ActiveStatus())
@@ -121,21 +120,20 @@ class ScriptExporterCharm(ops.CharmBase):
         try:
             self._obtain_exporter(exporter_url=EXPORTER_BINARY_URL, binary_sha=EXPORTER_BINARY_SHA)
         except HTTPError as e:
-            msg = "Script Exporter binary couldn't be downloaded - {}".format(str(e))
-            logger.warning(msg)
-            return
+            msg = f"Script Exporter binary couldn't be downloaded - {str(e)}"
+            logger.error(msg)
+            raise
 
     def _ensure_scripts_dir(self) -> None:
         # Create the scripts directory if it doesn't exist
-        if not os.path.exists(self._scripts_dir_path):
-            os.makedirs(self._scripts_dir_path)
+        self._scripts_dir_path.mkdir(parents=True, exist_ok=True)
 
     def _set_config_file(self) -> None:
         if not self.model.config["config_file"]:
             return
 
         config_file = self._insert_full_path_in_command(str(self.model.config["config_file"]))
-        self._write_file(self._config_path, config_file)
+        self._config_path.write_text(config_file)
         self._create_systemd_service()
 
     def _set_script_files(self) -> None:
@@ -143,26 +141,27 @@ class ScriptExporterCharm(ops.CharmBase):
             self._extract_scripts_archive(scripts_archive)
             return
 
-        if not self.model.config["script_file"]:
+        if not (script_file := self.model.config["script_file"]):
             return
 
-        self._write_file(self._single_script_path, str(self.model.config["script_file"]))
-        os.chmod(self._single_script_path, 0o755)
+        self._single_script_path.write_text(str(script_file), mode=0o755)
 
 
     def _extract_scripts_archive(self, scripts_archive: str) -> None:
-        data = base64.b64decode(str(scripts_archive))
-        decompressed = lzma.decompress(data)
-        tar_bytes = io.BytesIO(decompressed)
+        try:
+            tar_bytes = self._base64_compressed_to_tar_bytes(str(scripts_archive))
+        except LZMAError as e:
+            self._statuses.append(BlockedStatus(f"scripts_archive is not a valid lzma archive - {str(e)}"))
+            return
 
         with tarfile.open(fileobj=tar_bytes) as tar:
             tar.extractall(path=self._scripts_dir_path)
 
-        for path in Path(self._scripts_dir_path).rglob("*"):
-            if not path.is_file():
-                continue
+            for p in Path(self._scripts_dir_path).rglob("*"):
+                if not p.is_file():
+                    continue
 
-            os.chmod(path, 0o755)
+                p.chmod(0o755)
 
     def _insert_full_path_in_command(self, config: str) -> str:
         conf_dict = yaml.safe_load(config)
@@ -177,45 +176,42 @@ class ScriptExporterCharm(ops.CharmBase):
             if self._single_script_path in self._script_names:
                 continue
 
+            # Add prefix if the root is relative but keep as is if absolute.
             definition["command"] = os.path.join(self._scripts_dir_path, definition["command"])
 
         return yaml.dump(conf_dict)
 
-    def _write_file(self, path: Union[str, Path], content: str) -> None:
-        """Write content to a file."""
-        with open(path, "w") as f:
-            f.write(content)
-
-    def _remove_file_dir(self, fd_path: str) -> None:
+    def _remove_file_dir(self, fd_path: PathProtocol) -> None:
         """Remove a file or directory if it exists."""
         try:
-            if os.path.isdir(fd_path):
-                shutil.rmtree(fd_path, ignore_errors=True)
+            if fd_path.is_dir():
+                shutil.rmtree(str(fd_path), ignore_errors=True)
             else:
-                os.remove(fd_path)
-        except FileNotFoundError as e:
-            msg = f"file: '{fd_path}' could not be removed - {str(e)}"
-            logger.warning(msg)
-        except OSError as e:
-            msg = f"directory: '{fd_path}' could not be removed - {str(e)}"
+                fd_path.unlink()
+        except (FileNotFoundError, PermissionError) as e:
+            msg = f"'{fd_path}' could not be removed - {str(e)}"
             logger.warning(msg)
         except Exception as e:
             logger.error(e)
 
-    @property
-    def _script_names(self) -> List[str]:
+    def _retrieve_script_names(self) -> List[str]:
         if scripts_archive := self.model.config["scripts_archive"]:
-            data = base64.b64decode(str(scripts_archive))
-            decompressed = lzma.decompress(data)
-            tar_bytes = io.BytesIO(decompressed)
+            try:
+                tar_bytes = self._base64_compressed_to_tar_bytes(str(scripts_archive))
+            except LZMAError as e:
+                msg = f"scripts_archive is not a valid lzma archive - {str(e)}"
+                self._statuses.append(BlockedStatus(msg))
+                return []
 
             with tarfile.open(fileobj=tar_bytes) as tar:
                 return tar.getnames()
 
-        if str(self.model.config["script_file"]):
-            return [self._single_script_path]
+        return [str(self._single_script_path)] if self.model.config["script_file"] else []
 
-        return []
+    def _base64_compressed_to_tar_bytes(self, b64_compressed: str) -> io.BytesIO:
+        data = base64.b64decode(b64_compressed)
+        decompressed = decompress(data)
+        return io.BytesIO(decompressed)
 
     @property
     def self_scraping_job(self):
@@ -336,7 +332,7 @@ class ScriptExporterCharm(ops.CharmBase):
         logger.debug("Script Exporter binary file is already in the the charm container.")
         return False
 
-    def _sha256sums_matches(self, file_path: str, sha256sum: str) -> bool:
+    def _sha256sums_matches(self, file_path: PathProtocol, sha256sum: str) -> bool:
         """Check whether a file's sha256sum matches or not with a specific sha256sum.
 
         Args:
@@ -348,33 +344,30 @@ class ScriptExporterCharm(ops.CharmBase):
             a specific sha256sum.
         """
         try:
-            with open(file_path, "rb") as f:
-                file_bytes = f.read()
-                result = sha256(file_bytes).hexdigest()
+            file_bytes = file_path.read_bytes()
+            result = sha256(file_bytes).hexdigest()
 
-                if result != sha256sum:
-                    msg = "File sha256sum mismatch, expected:'{}' but got '{}'".format(
-                        sha256sum, result
-                    )
-                    logger.debug(msg)
-                    return False
+            if result != sha256sum:
+                msg = f"File sha256sum mismatch, expected:'{sha256sum}' but got '{result}'"
+                logger.debug(msg)
+                return False
 
-                return True
+            return True
         except (APIError, FileNotFoundError):
-            msg = "File: '{}' could not be opened".format(file_path)
+            msg = f"File: '{file_path}' could not be opened"
             logger.error(msg)
             return False
 
-    def _is_exporter_binary_in_charm(self, binary_path: str) -> bool:
+    def _is_exporter_binary_in_charm(self, binary_path: PathProtocol) -> bool:
         """Check if Script Exporter binary is already stored locally.
 
         Args:
-            binary_path: string path of the binary to check
+            binary_path: LocalPath of the binary to check
 
         Returns:
             a boolean representing whether Script Exporter is present or not.
         """
-        return True if Path(binary_path).is_file() else False
+        return True if binary_path.is_file() else False
 
     def _download_exporter_binary(self, exporter_url: str) -> None:
         """Download the Script Exporter binary file and move it to its new location.
@@ -384,13 +377,8 @@ class ScriptExporterCharm(ops.CharmBase):
         """
         with request.urlopen(exporter_url) as r:
             file_bytes = r.read()
-            with open(self._binary_path, "wb") as f:
-                f.write(file_bytes)
-                logger.info(
-                    "Script Exporter binary file has been downloaded and stored in: %s",
-                    self._binary_path,
-                )
-                os.chmod(self._binary_path, 0o755)
+            self._binary_path.write_bytes(file_bytes, mode=0o755)
+            logger.info("Script Exporter binary file has been downloaded and stored in: %s", self._binary_path)
 
 
 if __name__ == "__main__":  # pragma: nocover

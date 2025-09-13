@@ -31,7 +31,7 @@ PROMETHEUS_SIMPLE_CONFIG = """scrape_configs:
 """
 
 # This is the output of the following command:
-# tar -zc script1.sh script2.sh | base64
+# tar -z --lzma script1.sh script2.sh | base64
 # where script1.sh and script2.sh are:
 #
 # #!/bin/sh
