@@ -50,6 +50,7 @@ class ScriptExporterCharm(ops.CharmBase):
         self._single_script_path = "/etc/script-exporter-script"
         self._config_path = f"{self._script_exporter_dir}/config.yaml"
         self._binary_path = "/usr/local/bin/script_exporter"
+        self._statuses: List[StatusBase] = []
         self._binary_resource_name = "script-exporter-binary"
         self._script_daemon_service = Path("/etc/systemd/system/script-exporter.service")
 
@@ -80,7 +81,6 @@ class ScriptExporterCharm(ops.CharmBase):
     def _on_start(self, _: ops.StartEvent):
         """Handle start event."""
         service_restart("script-exporter.service")
-        self.set_status()
 
     def _on_stop(self, _: ops.StopEvent):
         """Ensure that script exporter is stopped."""
@@ -100,20 +100,20 @@ class ScriptExporterCharm(ops.CharmBase):
         self.set_status()
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent) -> None:
         """Calculate and set the unit status."""
-        statuses: List[StatusBase] = []
+        self._statuses.append(ActiveStatus())
 
         if not self.model.config["config_file"]:
-            statuses.append(ops.BlockedStatus('Please set the "config_file" config variable'))
+            self._statuses.append(BlockedStatus('Please set the "config_file" config variable'))
+
         if not (self.model.config["script_file"] or self.model.config["scripts_archive"]):
-            statuses.append(ops.BlockedStatus('Please set the "script_file" or "scripts_archive" config variable'))
+            self._statuses.append(BlockedStatus('Please set the "script_file" or "scripts_archive" config variable'))
+
         elif not self.model.config["prometheus_config_file"]:
-            statuses.append(ops.BlockedStatus(
+            self._statuses.append(BlockedStatus(
                 'Please set the "prometheus_config_file" config variable'
             ))
-        else:
-            statuses.append(ops.ActiveStatus())
 
-        for status in statuses:
+        for status in self._statuses:
             event.add_status(status)
 
     def _ensure_binary(self) -> None:
