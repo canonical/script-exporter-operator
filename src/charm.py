@@ -63,6 +63,7 @@ class ScriptExporterCharm(ops.CharmBase):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
 
     def _on_install(self, _: ops.InstallEvent):
         """Handle install event."""
@@ -97,6 +98,23 @@ class ScriptExporterCharm(ops.CharmBase):
         self._set_script_files()
         service_restart("script-exporter.service")
         self.set_status()
+    def _on_collect_unit_status(self, event: ops.CollectStatusEvent) -> None:
+        """Calculate and set the unit status."""
+        statuses: List[StatusBase] = []
+
+        if not self.model.config["config_file"]:
+            statuses.append(ops.BlockedStatus('Please set the "config_file" config variable'))
+        if not (self.model.config["script_file"] or self.model.config["scripts_archive"]):
+            statuses.append(ops.BlockedStatus('Please set the "script_file" or "scripts_archive" config variable'))
+        elif not self.model.config["prometheus_config_file"]:
+            statuses.append(ops.BlockedStatus(
+                'Please set the "prometheus_config_file" config variable'
+            ))
+        else:
+            statuses.append(ops.ActiveStatus())
+
+        for status in statuses:
+            event.add_status(status)
 
     def _ensure_binary(self) -> None:
         # Make sure the exporter binary is present with a systemd service
