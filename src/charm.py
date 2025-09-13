@@ -202,19 +202,6 @@ class ScriptExporterCharm(ops.CharmBase):
         except Exception as e:
             logger.error(e)
 
-    def set_status(self):
-        """Calculate and set the unit status."""
-        if not self.model.config["config_file"]:
-            self.unit.status = ops.BlockedStatus('Please set the "config_file" config variable')
-        if not (self.model.config["script_file"] or self.model.config["scripts_archive"]):
-            self.unit.status = ops.BlockedStatus('Please set the "script_file" or "scripts_archive" config variable')
-        elif not self.model.config["prometheus_config_file"]:
-            self.unit.status = ops.BlockedStatus(
-                'Please set the "prometheus_config_file" config variable'
-            )
-        else:
-            self.unit.status = ops.ActiveStatus()
-
     @property
     def _script_names(self) -> List[str]:
         if scripts_archive := self.model.config["scripts_archive"]:
