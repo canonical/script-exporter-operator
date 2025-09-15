@@ -6,7 +6,7 @@ version = "0.0"
 requires-python = "~=3.8"
 
 dependencies = [
-  "ops",
+  "ops<3",  # to be able to release for 20.04
   "cosl",
   "pydantic<2",
   "charmlibs-pathops",
