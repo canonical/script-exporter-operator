@@ -12,7 +12,7 @@ principal = SimpleNamespace(charm="ubuntu", name="principal")
 
 TESTS_INTEGRATION_DIR = Path(__file__).parent
 
-SCRIPT_CONFIG = TESTS_INTEGRATION_DIR / "script1.sh"
+SCRIPT_CONFIG = TESTS_INTEGRATION_DIR / "scripts" / "script1.sh"
 CONFIG_FILE = TESTS_INTEGRATION_DIR / "config_file.yaml"
 PROMETHEUS_CONFIG_FILE = TESTS_INTEGRATION_DIR / "prometheus_config_file.yaml"
 
