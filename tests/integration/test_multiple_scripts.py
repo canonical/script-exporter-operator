@@ -1,8 +1,12 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
+import base64
+import io
 import os
+import tarfile
 from pathlib import Path
 from types import SimpleNamespace
+from typing import List
 
 import pytest
 from juju.errors import JujuError
@@ -11,10 +15,11 @@ from pytest_operator.plugin import OpsTest
 principal = SimpleNamespace(charm="ubuntu", name="principal")
 
 TESTS_INTEGRATION_DIR = Path(__file__).parent
-
-SCRIPT_CONFIG = TESTS_INTEGRATION_DIR / "script.sh"
-CONFIG_FILE = TESTS_INTEGRATION_DIR / "config_file.yaml"
-PROMETHEUS_CONFIG_FILE = TESTS_INTEGRATION_DIR / "prometheus_config_file.yaml"
+SCRIPTS_DIR = TESTS_INTEGRATION_DIR / "scripts"
+SCRIPT1 = SCRIPTS_DIR/ "script1.sh"
+SCRIPT2 = SCRIPTS_DIR / "subdir" / "script2.sh"
+CONFIG_FILE = TESTS_INTEGRATION_DIR / "config_multiple.yaml"
+PROMETHEUS_CONFIG_FILE = TESTS_INTEGRATION_DIR / "prometheus_config_multiple.yaml"
 
 
 @pytest.mark.abort_on_fail
@@ -37,7 +42,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     await ops_test.model.applications["script-exporter"].set_config(
         {
-            "script_file": SCRIPT_CONFIG.read_text(),
+            "scripts_archive": tar_lzma_base64([SCRIPT1, SCRIPT2]),
             "config_file": CONFIG_FILE.read_text(),
             "prometheus_config_file": PROMETHEUS_CONFIG_FILE.read_text(),
         }
@@ -51,7 +56,23 @@ async def test_metrics(ops_test: OpsTest):
     assert ops_test.model
     unit = ops_test.model.applications["script-exporter"].units[0]
     try:
-        metrics = await unit.ssh("curl localhost:9469/probe?script=hello")
-        assert 'hello_world{param="argument"} 1' in metrics
+        metric_hello = await unit.ssh("curl localhost:9469/probe?script=hello")
+        assert 'hello_world{param="diego"} 1' in metric_hello
+
+        metric_bye = await unit.ssh("curl localhost:9469/probe?script=bye")
+        assert 'bye_world{param="maradona"} 1' in metric_bye
+
+        metric_champ = await unit.ssh("curl localhost:9469/probe?script=abspath")
+        assert 'champion{param="me"} 1' in metric_champ
     except JujuError as e:
         pytest.fail(f"Failed to collect metrics from the script-exporter: {e.message}")
+
+
+def tar_lzma_base64(paths: List[Path]) -> str:
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:xz") as tar:
+        for path in paths:
+            arcname = path.relative_to(SCRIPTS_DIR)
+            tar.add(path, arcname=arcname)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode("utf-8")

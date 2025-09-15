@@ -70,3 +70,12 @@ config:
       default: ""
       type: string
       description: Single script file for the exporter to execute.
+    scripts_archive:
+      default: ""
+      type: string
+      description: |
+        LZMA, base64-encoded archive of scripts (may have subfolders).
+
+        Example:
+
+          $ juju config script-exporter scripts_archive=@<(tar -c --lzma script1.sh subdir/script2.sh | base64)
