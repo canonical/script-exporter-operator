@@ -104,13 +104,10 @@ class ScriptExporterCharm(ops.CharmBase):
         if not self.model.config["config_file"]:
             self._statuses.append(BlockedStatus('Please set the "config_file" config variable'))
 
-        if not (self.model.config["script_file"] or self.model.config["scripts_archive"]):
-            self._statuses.append(BlockedStatus('Please set the "script_file" or "scripts_archive" config variable'))
-
         elif not self.model.config["prometheus_config_file"]:
-            self._statuses.append(BlockedStatus(
-                'Please set the "prometheus_config_file" config variable'
-            ))
+            self._statuses.append(
+                BlockedStatus('Please set the "prometheus_config_file" config variable')
+            )
 
         for status in self._statuses:
             event.add_status(status)
@@ -146,12 +143,13 @@ class ScriptExporterCharm(ops.CharmBase):
 
         self._single_script_path.write_text(str(script_file), mode=0o755)
 
-
     def _extract_scripts_archive(self, scripts_archive: str) -> None:
         try:
             tar_bytes = self._base64_compressed_to_tar_bytes(str(scripts_archive))
         except LZMAError as e:
-            self._statuses.append(BlockedStatus(f"scripts_archive is not a valid lzma archive - {str(e)}"))
+            self._statuses.append(
+                BlockedStatus(f"scripts_archive is not a valid lzma archive - {str(e)}")
+            )
             return
 
         with tarfile.open(fileobj=tar_bytes) as tar:
@@ -168,8 +166,8 @@ class ScriptExporterCharm(ops.CharmBase):
         scripts_def = conf_dict.get("scripts", [])
 
         for definition in scripts_def:
-            if definition.get("command", '') not in self._script_names:
-                msg  = f"{definition.get('command', '')} is not part of the uploaded scripts"
+            if definition.get("command", "") not in self._script_names:
+                msg = f"{definition.get('command', '')} is not part of the uploaded scripts"
                 logger.debug(msg)
                 continue
 
@@ -378,7 +376,10 @@ class ScriptExporterCharm(ops.CharmBase):
         with request.urlopen(exporter_url) as r:
             file_bytes = r.read()
             self._binary_path.write_bytes(file_bytes, mode=0o755)
-            logger.info("Script Exporter binary file has been downloaded and stored in: %s", self._binary_path)
+            logger.info(
+                "Script Exporter binary file has been downloaded and stored in: %s",
+                self._binary_path,
+            )
 
 
 if __name__ == "__main__":  # pragma: nocover
