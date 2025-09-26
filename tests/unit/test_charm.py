@@ -79,9 +79,17 @@ PROMETHEUS_MULTIPLE_CONFIG = """scrape_configs:
         - 127.0.0.1
 """
 
+
 @patch("charm.service_restart", MagicMock(return_value=True))
-def test_status_no_script(ctx):
-    state = State(config={"config_file": "", "script_file": "", "prometheus_config_file": ""})
+def test_status_no_config_file(ctx):
+    state = State(config={"config_file": ""})
+    state_out = ctx.run(ctx.on.config_changed(), state=state)
+    assert state_out.unit_status.name == "blocked"
+
+
+@patch("charm.service_restart", MagicMock(return_value=True))
+def test_status_no_prometheus_config_file(ctx):
+    state = State(config={"config_file": ""})
     state_out = ctx.run(ctx.on.config_changed(), state=state)
     assert state_out.unit_status.name == "blocked"
 
