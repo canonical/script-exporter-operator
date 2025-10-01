@@ -8,15 +8,13 @@ import base64
 import io
 import logging
 import os
+import platform
 import shutil
 import tarfile
 import textwrap
-from hashlib import sha256
 from lzma import LZMAError, decompress
 from pathlib import Path
 from typing import List
-from urllib import request
-from urllib.error import HTTPError
 
 import ops
 import yaml
@@ -31,14 +29,19 @@ from charms.operator_libs_linux.v1.systemd import (
 )
 from ops import ActiveStatus, BlockedStatus, StatusBase
 from ops.model import ModelError
-from ops.pebble import APIError
 
 logger = logging.getLogger(__name__)
 
 EXPORTER_PORT = 9469
 
-EXPORTER_BINARY_URL = "https://github.com/ricoberger/script_exporter/releases/download/v2.15.1/script_exporter-linux-amd64"
-EXPORTER_BINARY_SHA = "e7962a9863c015f721e3cec9af24c85e6b93be79ff992230d9d12029c89f456f"
+
+ARCH = platform.machine()
+if platform.machine() == "x86_64":
+    ARCH = "amd64"
+elif platform.machine() in ("aarch64", "armv8b", "armv8l"):
+    ARCH = "arm64"
+
+SERVICE_FILENAME = "script-exporter.service"
 
 
 class ScriptExporterCharm(ops.CharmBase):
@@ -53,7 +56,7 @@ class ScriptExporterCharm(ops.CharmBase):
         self._config_path = LocalPath(f"{self._script_exporter_dir}/config.yaml")
         self._binary_path = LocalPath("/usr/local/bin/script_exporter")
         self._binary_resource_name = "script-exporter-binary"
-        self._script_daemon_service = Path("/etc/systemd/system/script-exporter.service")
+        self._script_daemon_service = Path("/etc/systemd/system/{}".format(SERVICE_FILENAME))
 
         self.cos_agent = COSAgentProvider(
             charm=self,
@@ -78,12 +81,13 @@ class ScriptExporterCharm(ops.CharmBase):
 
     def _on_start(self, _: ops.StartEvent):
         """Handle start event."""
-        service_restart("script-exporter.service")
+        if not service_running(SERVICE_FILENAME) and self.model.config["config_file"]:
+            service_restart(SERVICE_FILENAME)
 
     def _on_stop(self, _: ops.StopEvent):
         """Ensure that script exporter is stopped."""
-        if service_running("script-exporter"):
-            service_stop("script-exporter")
+        if service_running(SERVICE_FILENAME):
+            service_stop(SERVICE_FILENAME)
 
         self._remove_file_dir(self._script_exporter_dir)
         self._remove_file_dir(self._binary_path)
@@ -95,7 +99,11 @@ class ScriptExporterCharm(ops.CharmBase):
         self._ensure_scripts_dir()
         self._set_config_file()
         self._set_script_files()
-        service_restart("script-exporter.service")
+
+        if self.model.config["config_file"]:
+            service_restart(SERVICE_FILENAME)
+        elif service_running(SERVICE_FILENAME):
+            service_stop(SERVICE_FILENAME)
 
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent) -> None:
         """Calculate and set the unit status."""
@@ -114,12 +122,15 @@ class ScriptExporterCharm(ops.CharmBase):
 
     def _ensure_binary(self) -> None:
         # Make sure the exporter binary is present with a systemd service
-        try:
-            self._obtain_exporter(exporter_url=EXPORTER_BINARY_URL, binary_sha=EXPORTER_BINARY_SHA)
-        except HTTPError as e:
-            msg = f"Script Exporter binary couldn't be downloaded - {str(e)}"
-            logger.error(msg)
-            raise
+        if self._push_exporter_if_attached():
+            return
+
+        shutil.copy("script_exporter-linux-{}".format(ARCH), self._binary_path)
+        os.chmod(self._binary_path, 0o755)
+        logger.info(
+            "Script Exporter binary installed from packaged files: %s", self._binary_path
+        )
+
 
     def _ensure_scripts_dir(self) -> None:
         # Create the scripts directory if it doesn't exist
@@ -272,23 +283,10 @@ class ScriptExporterCharm(ops.CharmBase):
         self._script_daemon_service.write_text(systemd_template)
 
         daemon_reload()
-        service_restart("script-exporter.service")
+        service_restart(SERVICE_FILENAME)
         # `enable --now`, but it's the only method which ACTUALLY enables it
         # so it will survive reboots
-        service_resume("script-exporter.service")
-
-    def _obtain_exporter(self, exporter_url: str, binary_sha: str) -> None:
-        """Obtain Script Exporter binary from an attached resource or download it.
-
-        Args:
-            exporter_url: url of script exporter binary
-            binary_sha: sha of the script exporter binary
-        """
-        # If not coming from resource and not existing already, download the exporter
-        if not self._push_exporter_if_attached() and self._script_exporter_must_be_downloaded(
-            binary_sha
-        ):
-            self._download_exporter_binary(exporter_url)
+        service_resume(SERVICE_FILENAME)
 
     def _push_exporter_if_attached(self) -> bool:
         """Check whether Script Exporter binary is attached to the charm or not.
@@ -311,75 +309,6 @@ class ScriptExporterCharm(ops.CharmBase):
             os.chmod(self._binary_path, 0o755)
             return True
         return False
-
-    def _script_exporter_must_be_downloaded(self, binary_sha: str) -> bool:
-        """Check whether script exporter binary must be downloaded or not.
-
-        Args:
-            binary_sha: string sha of the script exporter binary
-
-        Returns:
-            a boolean representing whether Script Exporter should be downloaded
-        """
-        if not self._is_exporter_binary_in_charm(self._binary_path):
-            return True
-
-        if not self._sha256sums_matches(self._binary_path, binary_sha):
-            return True
-
-        logger.debug("Script Exporter binary file is already in the the charm container.")
-        return False
-
-    def _sha256sums_matches(self, file_path: PathProtocol, sha256sum: str) -> bool:
-        """Check whether a file's sha256sum matches or not with a specific sha256sum.
-
-        Args:
-            file_path: A string representing the files' patch.
-            sha256sum: The sha256sum against which we want to verify.
-
-        Returns:
-            a boolean representing whether a file's sha256sum matches or not with
-            a specific sha256sum.
-        """
-        try:
-            file_bytes = file_path.read_bytes()
-            result = sha256(file_bytes).hexdigest()
-
-            if result != sha256sum:
-                msg = f"File sha256sum mismatch, expected:'{sha256sum}' but got '{result}'"
-                logger.debug(msg)
-                return False
-
-            return True
-        except (APIError, FileNotFoundError):
-            msg = f"File: '{file_path}' could not be opened"
-            logger.error(msg)
-            return False
-
-    def _is_exporter_binary_in_charm(self, binary_path: PathProtocol) -> bool:
-        """Check if Script Exporter binary is already stored locally.
-
-        Args:
-            binary_path: LocalPath of the binary to check
-
-        Returns:
-            a boolean representing whether Script Exporter is present or not.
-        """
-        return True if binary_path.is_file() else False
-
-    def _download_exporter_binary(self, exporter_url: str) -> None:
-        """Download the Script Exporter binary file and move it to its new location.
-
-        Args:
-            exporter_url: url where to get Script Exporter binary from
-        """
-        with request.urlopen(exporter_url) as r:
-            file_bytes = r.read()
-            self._binary_path.write_bytes(file_bytes, mode=0o755)
-            logger.info(
-                "Script Exporter binary file has been downloaded and stored in: %s",
-                self._binary_path,
-            )
 
 
 if __name__ == "__main__":  # pragma: nocover

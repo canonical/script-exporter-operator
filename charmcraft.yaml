@@ -17,8 +17,11 @@ subordinate: true
 
 platforms:
   ubuntu@20.04:amd64:
+  ubuntu@20.04:arm64:
   ubuntu@22.04:amd64:
+  ubuntu@22.04:arm64:
   ubuntu@24.04:amd64:
+  ubuntu@24.04:arm64:
 
 parts:
   charm:
@@ -29,6 +32,14 @@ parts:
     override-build: |
       craftctl default
       git describe --always > $CRAFT_PART_INSTALL/version
+
+  script-exporter-binary:
+    plugin: dump
+    source: https://github.com/ricoberger/script_exporter/releases/download/v2.15.1/script_exporter-linux-${CRAFT_ARCH_BUILD_FOR}
+    source-type: file
+    permissions:
+      - path: script_exporter-linux-${CRAFT_ARCH_BUILD_FOR}
+        mode: "755"
 
 resources:
   script-exporter-binary:
