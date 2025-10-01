@@ -81,7 +81,8 @@ class ScriptExporterCharm(ops.CharmBase):
 
     def _on_start(self, _: ops.StartEvent):
         """Handle start event."""
-        service_restart(SERVICE_FILENAME)
+        if not service_running(SERVICE_FILENAME) and self.model.config["config_file"]:
+            service_restart(SERVICE_FILENAME)
 
     def _on_stop(self, _: ops.StopEvent):
         """Ensure that script exporter is stopped."""
