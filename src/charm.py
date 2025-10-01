@@ -41,6 +41,8 @@ if platform.machine() == "x86_64":
 elif platform.machine() in ("aarch64", "armv8b", "armv8l"):
     ARCH = "arm64"
 
+SERVICE_FILENAME = "script-exporter.service"
+
 
 class ScriptExporterCharm(ops.CharmBase):
     """Charm the application."""
@@ -54,7 +56,7 @@ class ScriptExporterCharm(ops.CharmBase):
         self._config_path = LocalPath(f"{self._script_exporter_dir}/config.yaml")
         self._binary_path = LocalPath("/usr/local/bin/script_exporter")
         self._binary_resource_name = "script-exporter-binary"
-        self._script_daemon_service = Path("/etc/systemd/system/script-exporter.service")
+        self._script_daemon_service = Path("/etc/systemd/system/{}".format(SERVICE_FILENAME))
 
         self.cos_agent = COSAgentProvider(
             charm=self,
@@ -79,12 +81,12 @@ class ScriptExporterCharm(ops.CharmBase):
 
     def _on_start(self, _: ops.StartEvent):
         """Handle start event."""
-        service_restart("script-exporter.service")
+        service_restart(SERVICE_FILENAME)
 
     def _on_stop(self, _: ops.StopEvent):
         """Ensure that script exporter is stopped."""
-        if service_running("script-exporter"):
-            service_stop("script-exporter")
+        if service_running(SERVICE_FILENAME):
+            service_stop(SERVICE_FILENAME)
 
         self._remove_file_dir(self._script_exporter_dir)
         self._remove_file_dir(self._binary_path)
@@ -96,7 +98,11 @@ class ScriptExporterCharm(ops.CharmBase):
         self._ensure_scripts_dir()
         self._set_config_file()
         self._set_script_files()
-        service_restart("script-exporter.service")
+
+        if self.model.config["config_file"]:
+            service_restart(SERVICE_FILENAME)
+        elif service_running(SERVICE_FILENAME):
+            service_stop(SERVICE_FILENAME)
 
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent) -> None:
         """Calculate and set the unit status."""
@@ -276,10 +282,10 @@ class ScriptExporterCharm(ops.CharmBase):
         self._script_daemon_service.write_text(systemd_template)
 
         daemon_reload()
-        service_restart("script-exporter.service")
+        service_restart(SERVICE_FILENAME)
         # `enable --now`, but it's the only method which ACTUALLY enables it
         # so it will survive reboots
-        service_resume("script-exporter.service")
+        service_resume(SERVICE_FILENAME)
 
     def _push_exporter_if_attached(self) -> bool:
         """Check whether Script Exporter binary is attached to the charm or not.
