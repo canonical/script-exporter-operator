@@ -35,10 +35,11 @@ logger = logging.getLogger(__name__)
 EXPORTER_PORT = 9469
 
 
-def _arch():
-    arch = platform.machine()
-    arch = "amd64" if arch == "x86_64" else arch
-    return arch
+ARCH = platform.machine()
+if platform.machine() == "x86_64":
+    ARCH = "amd64"
+elif platform.machine() in ("aarch64", "arm64", "armv8b", "armv8l"):
+    ARCH = "arm64"
 
 
 class ScriptExporterCharm(ops.CharmBase):
@@ -52,7 +53,6 @@ class ScriptExporterCharm(ops.CharmBase):
         self._single_script_path = LocalPath("/etc/script-exporter-script")
         self._config_path = LocalPath(f"{self._script_exporter_dir}/config.yaml")
         self._binary_path = LocalPath("/usr/local/bin/script_exporter")
-        self._packaged_binary_path = Path(self.charm_dir) / f"script_exporter-linux-{_arch()}"
         self._binary_resource_name = "script-exporter-binary"
         self._script_daemon_service = Path("/etc/systemd/system/script-exporter.service")
 
@@ -118,7 +118,7 @@ class ScriptExporterCharm(ops.CharmBase):
         if self._push_exporter_if_attached():
             return
 
-        shutil.copy(self._packaged_binary_path, self._binary_path)
+        shutil.copy("script_exporter-linux-{}".format(ARCH), self._binary_path)
         os.chmod(self._binary_path, 0o755)
         logger.info(
             "Script Exporter binary installed from packaged files: %s", self._binary_path
