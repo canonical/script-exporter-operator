@@ -38,7 +38,7 @@ EXPORTER_PORT = 9469
 ARCH = platform.machine()
 if platform.machine() == "x86_64":
     ARCH = "amd64"
-elif platform.machine() in ("aarch64", "arm64", "armv8b", "armv8l"):
+elif platform.machine() in ("aarch64", "armv8b", "armv8l"):
     ARCH = "arm64"
 
 
