@@ -41,12 +41,6 @@ parts:
       - path: script_exporter-linux-${CRAFT_ARCH_BUILD_FOR}
         mode: "755"
 
-resources:
-  script-exporter-binary:
-    type: file
-    description: Binary for Script Exporter
-    filename: script_exporter
-
 provides:
   cos-agent:
     interface: cos_agent

@@ -28,7 +28,6 @@ from charms.operator_libs_linux.v1.systemd import (
     service_stop,
 )
 from ops import ActiveStatus, BlockedStatus, StatusBase
-from ops.model import ModelError
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,6 @@ class ScriptExporterCharm(ops.CharmBase):
         self._single_script_path = LocalPath("/etc/script-exporter-script")
         self._config_path = LocalPath(f"{self._script_exporter_dir}/config.yaml")
         self._binary_path = LocalPath("/usr/local/bin/script_exporter")
-        self._binary_resource_name = "script-exporter-binary"
         self._script_daemon_service = Path("/etc/systemd/system/{}".format(SERVICE_FILENAME))
 
         self.cos_agent = COSAgentProvider(
@@ -122,9 +120,6 @@ class ScriptExporterCharm(ops.CharmBase):
 
     def _ensure_binary(self) -> None:
         # Make sure the exporter binary is present with a systemd service
-        if self._push_exporter_if_attached():
-            return
-
         shutil.copy("script_exporter-linux-{}".format(ARCH), self._binary_path)
         os.chmod(self._binary_path, 0o755)
         logger.info(
@@ -288,27 +283,6 @@ class ScriptExporterCharm(ops.CharmBase):
         # so it will survive reboots
         service_resume(SERVICE_FILENAME)
 
-    def _push_exporter_if_attached(self) -> bool:
-        """Check whether Script Exporter binary is attached to the charm or not.
-
-        Returns:
-            a boolean representing whether Script Exporter binary is attached or not.
-        """
-        try:
-            resource_path = self.model.resources.fetch(self._binary_resource_name)
-        except ModelError:
-            return False
-        except NameError as e:
-            if "invalid resource name" in str(e):
-                return False
-            raise
-
-        if resource_path:
-            logger.info("Script Exporter binary file has been obtained from an attached resource.")
-            shutil.copy(resource_path, self._binary_path)
-            os.chmod(self._binary_path, 0o755)
-            return True
-        return False
 
 
 if __name__ == "__main__":  # pragma: nocover
