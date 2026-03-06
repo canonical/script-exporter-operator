@@ -89,9 +89,14 @@ def test_status_no_config_file(ctx):
 
 @patch("charm.service_restart", MagicMock(return_value=True))
 def test_status_no_prometheus_config_file(ctx):
-    state = State(config={"config_file": ""})
-    state_out = ctx.run(ctx.on.config_changed(), state=state)
-    assert state_out.unit_status.name == "blocked"
+    state = State(config={"prometheus_config_file": "",
+                           "config_file": EXAMPLE_SIMPLE_CONFIG,
+                           #"scripts_archive": EXAMPLE_B64_COMPRESSED_SCRIPTS
+                           "script_file": EXAMPLE_SIMPLE_SCRIPT
+                           })
+    with patch("charm.ScriptExporterCharm._create_systemd_service", MagicMock(return_value=None)):
+      state_out = ctx.run(ctx.on.config_changed(), state=state)
+      assert state_out.unit_status.name == "active"
 
 
 def test_cos_agent_relation_data_is_set_script_file(ctx):

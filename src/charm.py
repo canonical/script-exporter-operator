@@ -110,11 +110,6 @@ class ScriptExporterCharm(ops.CharmBase):
         if not self.model.config["config_file"]:
             self._statuses.append(BlockedStatus('Please set the "config_file" config variable'))
 
-        elif not self.model.config["prometheus_config_file"]:
-            self._statuses.append(
-                BlockedStatus('Please set the "prometheus_config_file" config variable')
-            )
-
         for status in self._statuses:
             event.add_status(status)
 
