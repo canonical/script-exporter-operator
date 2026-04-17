@@ -4,8 +4,23 @@ name: script-exporter
 type: charm
 summary: Prometheus compatible Script exporter.
 description: |
-  Exporter that exposes information gathered from generic Scripts for use by the a Prometheus
-  compatible monitoring system.
+  Script Exporter is a Juju subordinate charm that deploys the Prometheus Script Exporter on
+  machines, exposing metrics gathered from the output of user-defined scripts over a
+  Prometheus-compatible endpoint. It is a complementary charm to the Canonical Observability
+  Stack (COS):
+  https://documentation.ubuntu.com/observability
+
+  As a subordinate, it is deployed alongside a principal charm and runs scripts on the host
+  machine, converting their output into metrics that Prometheus can scrape.
+
+  Key features:
+
+  - Execute custom scripts and expose their output as Prometheus metrics.
+  - Support for single script files or archives containing multiple scripts with subdirectories.
+  - Configurable script exporter and Prometheus scrape job definitions via Juju config.
+  - Integration with the cos-agent interface for forwarding scrape jobs to the OpenTelemetry
+    Collector or Grafana Agent.
+  - Multi-platform support (amd64 and arm64) across Ubuntu 20.04, 22.04, and 24.04.
 
 links:
   documentation: https://discourse.charmhub.io/t/script-exporter-docs-index
