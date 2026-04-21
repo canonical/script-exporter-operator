@@ -20,7 +20,6 @@ description: |
   - Configurable script exporter and Prometheus scrape job definitions via Juju config.
   - Integration with the cos-agent interface for forwarding scrape jobs to the OpenTelemetry
     Collector or Grafana Agent.
-  - Multi-platform support (amd64 and arm64) across Ubuntu 20.04, 22.04, and 24.04.
 
 links:
   documentation: https://discourse.charmhub.io/t/script-exporter-docs-index
