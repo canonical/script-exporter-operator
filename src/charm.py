@@ -160,8 +160,7 @@ class ScriptExporterCharm(ops.CharmBase):
         scripts_def = conf_dict.get("scripts", [])
 
         for definition in scripts_def:
-            command = definition.get("command", [])
-            if not command:
+            if not command := definition.get("command", []):
                 continue
 
             executable = command[0]
