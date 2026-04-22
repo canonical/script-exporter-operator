@@ -40,7 +40,8 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
     ```yaml
     scripts:
       - name: hello # Name of the script, arbitrary
-        command: /etc/script-exporter-script # any available shell command, or `/etc/script-exporter-script` for the custom one
+        command:
+          - /etc/script-exporter/scripts/script-exporter-script # path to any available shell command, or the custom script path
         args:
           - argument # args to pass to the script
     ```
@@ -60,7 +61,6 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
         metrics_path: /probe
         params:
           script: [hello] # the name of the script as specified in the *config_file*
-          prefix: [script] # a custom prefix for this metric
         static_configs:
           - targets:
             - 127.0.0.1
@@ -113,12 +113,14 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
     ```yaml
     scripts:
       - name: hello
-        command: script1.sh
+        command:
+          - script1.sh
         args:
           - diego
 
       - name: bye
-        command: subdir/script2.sh
+        command:
+          - subdir/script2.sh
         args:
           - maradona
     ```
@@ -138,7 +140,6 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
         metrics_path: /probe
         params:
           script: [hello]
-          prefix: [script]
         static_configs:
           - targets:
             - 127.0.0.1
@@ -147,7 +148,6 @@ The script-exporter is a subordinate charm; relating it to a *principal* over **
         metrics_path: /probe
         params:
           script: [bye]
-          prefix: [script]
         static_configs:
           - targets:
             - 127.0.0.1

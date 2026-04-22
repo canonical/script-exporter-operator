@@ -49,10 +49,10 @@ parts:
 
   script-exporter-binary:
     plugin: dump
-    source: https://github.com/ricoberger/script_exporter/releases/download/v2.15.1/script_exporter-linux-${CRAFT_ARCH_BUILD_FOR}
-    source-type: file
+    source: https://github.com/ricoberger/script_exporter/releases/download/v3.2.0/script_exporter-linux-${CRAFT_ARCH_BUILD_FOR}.tar.gz
+    source-type: tar
     permissions:
-      - path: script_exporter-linux-${CRAFT_ARCH_BUILD_FOR}
+      - path: script_exporter
         mode: "755"
 
 provides:

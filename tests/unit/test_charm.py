@@ -11,7 +11,8 @@ exit $?
 
 EXAMPLE_SIMPLE_CONFIG = """scripts:
   - name: ping
-    command: /etc/script
+    command:
+      - /etc/script
     args:
       - 127.0.0.1
 """
@@ -21,7 +22,6 @@ PROMETHEUS_SIMPLE_CONFIG = """scrape_configs:
     metrics_path: /probe
     params:
       script: [ping]
-      prefix: [script]
     static_configs:
       - targets:
         - 127.0.0.1
@@ -49,12 +49,14 @@ AAAAAMAfuQIhncIHACgAAA==
 
 EXAMPLE_MULTIPLE_CONFIG = """scripts:
   - name: hello
-    command: script1.sh
+    command:
+      - script1.sh
     args:
       - diego
 
   - name: bye
-    command: script2.sh
+    command:
+      - script2.sh
     args:
       - maradona
 """
@@ -64,7 +66,6 @@ PROMETHEUS_MULTIPLE_CONFIG = """scrape_configs:
     metrics_path: /probe
     params:
       script: [hello]
-      prefix: [script]
     static_configs:
       - targets:
         - 127.0.0.1
@@ -73,7 +74,6 @@ PROMETHEUS_MULTIPLE_CONFIG = """scrape_configs:
     metrics_path: /probe
     params:
       script: [bye]
-      prefix: [script]
     static_configs:
       - targets:
         - 127.0.0.1

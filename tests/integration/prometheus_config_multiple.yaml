@@ -3,7 +3,6 @@ scrape_configs:
     metrics_path: /probe
     params:
       script: [hello]
-      prefix: [script]
     static_configs:
       - targets:
         - 127.0.0.1
@@ -12,7 +11,6 @@ scrape_configs:
     metrics_path: /probe
     params:
       script: [bye]
-      prefix: [script]
     static_configs:
       - targets:
         - 127.0.0.1
@@ -21,7 +19,6 @@ scrape_configs:
     metrics_path: /probe
     params:
       script: [abspath]
-      prefix: [script]
     static_configs:
       - targets:
         - 127.0.0.1

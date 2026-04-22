@@ -8,7 +8,6 @@ import base64
 import io
 import logging
 import os
-import platform
 import shutil
 import tarfile
 import textwrap
@@ -33,12 +32,6 @@ logger = logging.getLogger(__name__)
 
 EXPORTER_PORT = 9469
 
-
-ARCH = platform.machine()
-if platform.machine() == "x86_64":
-    ARCH = "amd64"
-elif platform.machine() in ("aarch64", "armv8b", "armv8l"):
-    ARCH = "arm64"
 
 SERVICE_FILENAME = "script-exporter.service"
 
@@ -115,7 +108,7 @@ class ScriptExporterCharm(ops.CharmBase):
 
     def _ensure_binary(self) -> None:
         # Make sure the exporter binary is present with a systemd service
-        shutil.copy("script_exporter-linux-{}".format(ARCH), self._binary_path)
+        shutil.copy("script_exporter", self._binary_path)
         os.chmod(self._binary_path, 0o755)
         logger.info(
             "Script Exporter binary installed from packaged files: %s", self._binary_path
@@ -167,8 +160,13 @@ class ScriptExporterCharm(ops.CharmBase):
         scripts_def = conf_dict.get("scripts", [])
 
         for definition in scripts_def:
-            if definition.get("command", "") not in self._script_names:
-                msg = f"{definition.get('command', '')} is not part of the uploaded scripts"
+            if not (command := definition.get("command", [])):
+                continue
+
+            executable = command[0]
+
+            if executable not in self._script_names:
+                msg = f"{executable} is not part of the uploaded scripts"
                 logger.debug(msg)
                 continue
 
@@ -176,7 +174,7 @@ class ScriptExporterCharm(ops.CharmBase):
                 continue
 
             # Add prefix if the root is relative but keep as is if absolute.
-            definition["command"] = os.path.join(self._scripts_dir_path, definition["command"])
+            command[0] = os.path.join(self._scripts_dir_path, executable)
 
         return yaml.dump(conf_dict)
 
@@ -262,7 +260,7 @@ class ScriptExporterCharm(ops.CharmBase):
             [Service]
             LimitNPROC=infinity
             LimitNOFILE=infinity
-            ExecStart={self._binary_path} --config.file={self._config_path}
+            ExecStart={self._binary_path} --config.files={self._config_path}
             Restart=always
 
             [Install]
