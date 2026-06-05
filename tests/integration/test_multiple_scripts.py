@@ -1,74 +1,29 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
+
+"""Integration test for script-exporter with multiple scripts via archive."""
+
 import base64
 import io
-import os
 import tarfile
 from pathlib import Path
-from types import SimpleNamespace
-from typing import List
 
+import jubilant
 import pytest
-from juju.errors import JujuError
-from pytest_operator.plugin import OpsTest
-
-principal = SimpleNamespace(charm="ubuntu", name="principal")
 
 TESTS_INTEGRATION_DIR = Path(__file__).parent
 SCRIPTS_DIR = TESTS_INTEGRATION_DIR / "scripts"
-SCRIPT1 = SCRIPTS_DIR/ "script1.sh"
+SCRIPT1 = SCRIPTS_DIR / "script1.sh"
 SCRIPT2 = SCRIPTS_DIR / "subdir" / "script2.sh"
 CONFIG_FILE = TESTS_INTEGRATION_DIR / "config_multiple.yaml"
 PROMETHEUS_CONFIG_FILE = TESTS_INTEGRATION_DIR / "prometheus_config_multiple.yaml"
 
-
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
-    assert ops_test.model
-    await ops_test.model.deploy(principal.charm, application_name=principal.name, series="noble")
-
-    if charm_file := os.environ.get("CHARM_PATH"):
-        charm = Path(charm_file)
-    else:
-        charm = await ops_test.build_charm(".")
-
-    await ops_test.model.deploy(
-        charm,
-        application_name="script-exporter",
-        num_units=0,
-    )
-
-    await ops_test.model.integrate("script-exporter", principal.name)
-
-    await ops_test.model.applications["script-exporter"].set_config(
-        {
-            "scripts_archive": tar_lzma_base64([SCRIPT1, SCRIPT2]),
-            "config_file": CONFIG_FILE.read_text(),
-            "prometheus_config_file": PROMETHEUS_CONFIG_FILE.read_text(),
-        }
-    )
-
-    await ops_test.model.wait_for_idle()
+APP_NAME = "script-exporter"
+PRINCIPAL_APP_NAME = "principal"
 
 
-@pytest.mark.abort_on_fail
-async def test_metrics(ops_test: OpsTest):
-    assert ops_test.model
-    unit = ops_test.model.applications["script-exporter"].units[0]
-    try:
-        metric_hello = await unit.ssh("curl localhost:9469/probe?script=hello")
-        assert 'hello_world{param="diego"} 1' in metric_hello
-
-        metric_bye = await unit.ssh("curl localhost:9469/probe?script=bye")
-        assert 'bye_world{param="maradona"} 1' in metric_bye
-
-        metric_champ = await unit.ssh("curl localhost:9469/probe?script=abspath")
-        assert 'champion{param="me"} 1' in metric_champ
-    except JujuError as e:
-        pytest.fail(f"Failed to collect metrics from the script-exporter: {e.message}")
-
-
-def tar_lzma_base64(paths: List[Path]) -> str:
+def tar_lzma_base64(paths: list[Path]) -> str:
+    """Create a base64-encoded LZMA tar archive from the given paths."""
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:xz") as tar:
         for path in paths:
@@ -76,3 +31,54 @@ def tar_lzma_base64(paths: List[Path]) -> str:
             tar.add(path, arcname=arcname)
     buf.seek(0)
     return base64.b64encode(buf.read()).decode("utf-8")
+
+
+@pytest.fixture(scope="module")
+def deployed_charm(juju: jubilant.Juju, charm: str):
+    """Deploy the charm with multiple scripts via archive."""
+    juju.deploy("ubuntu", app=PRINCIPAL_APP_NAME, base="ubuntu@24.04")
+    juju.deploy(charm, app=APP_NAME)
+    juju.integrate(APP_NAME, PRINCIPAL_APP_NAME)
+
+    juju.config(
+        APP_NAME,
+        {
+            "scripts_archive": tar_lzma_base64([SCRIPT1, SCRIPT2]),
+            "config_file": CONFIG_FILE.read_text(),
+            "prometheus_config_file": PROMETHEUS_CONFIG_FILE.read_text(),
+        },
+    )
+
+    juju.wait(
+        lambda status: jubilant.all_active(status, PRINCIPAL_APP_NAME),
+        timeout=600,
+    )
+
+    yield juju
+
+    juju.remove_application(APP_NAME, force=True)
+    juju.remove_application(PRINCIPAL_APP_NAME, force=True)
+
+
+def test_metrics_hello(deployed_charm: jubilant.Juju):
+    """Test hello script metrics."""
+    juju = deployed_charm
+    task = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=hello")
+    metrics = task.stdout
+    assert 'hello_world{param="diego"} 1' in metrics, f"Expected metric not found in: {metrics}"
+
+
+def test_metrics_bye(deployed_charm: jubilant.Juju):
+    """Test bye script metrics."""
+    juju = deployed_charm
+    task = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=bye")
+    metrics = task.stdout
+    assert 'bye_world{param="maradona"} 1' in metrics, f"Expected metric not found in: {metrics}"
+
+
+def test_metrics_abspath(deployed_charm: jubilant.Juju):
+    """Test abspath script metrics."""
+    juju = deployed_charm
+    task = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=abspath")
+    metrics = task.stdout
+    assert 'champion{param="me"} 1' in metrics, f"Expected metric not found in: {metrics}"

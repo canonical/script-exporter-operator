@@ -16,9 +16,13 @@ from pathlib import Path
 from typing import List
 
 import ops
+import ops_tracing
 import yaml
 from charmlibs.pathops import LocalPath, PathProtocol
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider
+from charms.certificate_transfer_interface.v1.certificate_transfer import (
+    CertificateTransferRequires,
+)
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
     service_restart,
@@ -31,6 +35,7 @@ from ops import ActiveStatus, BlockedStatus, StatusBase
 logger = logging.getLogger(__name__)
 
 EXPORTER_PORT = 9469
+CA_CERT_PATH = Path("/etc/script-exporter/receive-ca-cert.crt")
 
 
 SERVICE_FILENAME = "script-exporter.service"
@@ -49,17 +54,39 @@ class ScriptExporterCharm(ops.CharmBase):
         self._binary_path = LocalPath("/usr/local/bin/script_exporter")
         self._script_daemon_service = Path("/etc/systemd/system/{}".format(SERVICE_FILENAME))
 
-        self.cos_agent = COSAgentProvider(
+        self._cos_agent = COSAgentProvider(
             charm=self,
             scrape_configs=self.self_scraping_job + self.scripts_scraping_jobs,
             refresh_events=[self.on.config_changed],
+            tracing_protocols=["otlp_http"],
         )
+
+        self._cert_transfer = CertificateTransferRequires(self, "receive-ca-cert")
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
+
+        self.framework.observe(
+            self.on.cos_agent_relation_joined,  # pyright: ignore
+            self._on_cos_agent_relation_changed,
+        )
+        self.framework.observe(
+            self.on.cos_agent_relation_changed,  # pyright: ignore
+            self._on_cos_agent_relation_changed,
+        )
+        self.framework.observe(
+            self._cert_transfer.on.certificate_set_updated,  # pyright: ignore
+            self._on_cert_transfer_available,
+        )
+        self.framework.observe(
+            self._cert_transfer.on.certificates_removed,  # pyright: ignore
+            self._on_cert_transfer_removed,
+        )
+
+        self._reconcile_charm_tracing()
 
     def _on_install(self, _: ops.InstallEvent):
         """Handle install event."""
@@ -276,6 +303,33 @@ class ScriptExporterCharm(ops.CharmBase):
         # so it will survive reboots
         service_resume(SERVICE_FILENAME)
 
+    def _reconcile_charm_tracing(self):
+        """Configure ops.tracing to send traces to a tracing backend via cos-agent."""
+        endpoint, ca_cert_path = charm_tracing_config(self._cos_agent, CA_CERT_PATH)
+        if not endpoint:
+            return
+        ca_cert = Path(ca_cert_path).read_text() if ca_cert_path else None
+        ops_tracing.set_destination(
+            url=endpoint + "/v1/traces",
+            ca=ca_cert,
+        )
+
+    def _on_cos_agent_relation_changed(self, _):
+        """Reconcile charm tracing when cos-agent relation changes."""
+        self._reconcile_charm_tracing()
+
+    def _on_cert_transfer_available(self, event):
+        """Write received CA certificates to disk and reconcile tracing."""
+        CA_CERT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        certs = "\n\n".join(event.certificates)
+        CA_CERT_PATH.write_text(certs + "\n")
+        self._reconcile_charm_tracing()
+
+    def _on_cert_transfer_removed(self, _):
+        """Remove CA certificate file and reconcile tracing."""
+        if CA_CERT_PATH.exists():
+            CA_CERT_PATH.unlink()
+        self._reconcile_charm_tracing()
 
 
 if __name__ == "__main__":  # pragma: nocover

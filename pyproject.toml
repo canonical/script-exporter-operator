@@ -6,7 +6,7 @@ version = "0.0"
 requires-python = "~=3.8"
 
 dependencies = [
-  "ops<3",  # to be able to release for 20.04
+  "ops[tracing]<3",  # to be able to release for 20.04
   "cosl",
   "pydantic<2",
   "charmlibs-pathops",
@@ -24,10 +24,11 @@ dev = [
   "coverage[toml]",
   "ops[testing]",
   # Integration
-  "juju",
-  "pytest-operator",
-  "aiohttp",
-  "asyncstdlib",
+  "jubilant",
+  "pytest-jubilant>=2",
+  "pytest-bdd",
+  "tenacity",
+  "sh",
 ]
 
 # Testing tools configuration
@@ -74,6 +75,10 @@ include = ["src/**.py"]
 extraPaths = ["src", "lib"]
 pythonVersion = "3.8"
 pythonPlatform = "All"
+exclude = [
+  "tests/integration/test_simple_script.py",
+  "tests/integration/test_multiple_scripts.py",
+]
 
 [tool.codespell]
 skip = ".git,.tox,build,venv*"

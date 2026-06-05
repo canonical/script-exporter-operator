@@ -1,57 +1,52 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-import os
+
+"""Integration test for script-exporter with a simple script configuration."""
+
 from pathlib import Path
-from types import SimpleNamespace
 
+import jubilant
 import pytest
-from juju.errors import JujuError
-from pytest_operator.plugin import OpsTest
-
-principal = SimpleNamespace(charm="ubuntu", name="principal")
 
 TESTS_INTEGRATION_DIR = Path(__file__).parent
-
 SCRIPT_CONFIG = TESTS_INTEGRATION_DIR / "scripts" / "script1.sh"
 CONFIG_FILE = TESTS_INTEGRATION_DIR / "config_file.yaml"
 PROMETHEUS_CONFIG_FILE = TESTS_INTEGRATION_DIR / "prometheus_config_file.yaml"
 
+APP_NAME = "script-exporter"
+PRINCIPAL_APP_NAME = "principal"
 
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
-    assert ops_test.model
-    await ops_test.model.deploy(principal.charm, application_name=principal.name, series="noble")
 
-    if charm_file := os.environ.get("CHARM_PATH"):
-        charm = Path(charm_file)
-    else:
-        charm = await ops_test.build_charm(".")
+@pytest.fixture(scope="module")
+def deployed_charm(juju: jubilant.Juju, charm: str):
+    """Deploy the charm with a simple script configuration."""
+    juju.deploy("ubuntu", app=PRINCIPAL_APP_NAME, base="ubuntu@24.04")
+    juju.deploy(charm, app=APP_NAME)
+    juju.integrate(APP_NAME, PRINCIPAL_APP_NAME)
 
-    await ops_test.model.deploy(
-        charm,
-        application_name="script-exporter",
-        num_units=0,
-    )
-
-    await ops_test.model.integrate("script-exporter", principal.name)
-
-    await ops_test.model.applications["script-exporter"].set_config(
+    juju.config(
+        APP_NAME,
         {
             "script_file": SCRIPT_CONFIG.read_text(),
             "config_file": CONFIG_FILE.read_text(),
             "prometheus_config_file": PROMETHEUS_CONFIG_FILE.read_text(),
-        }
+        },
     )
 
-    await ops_test.model.wait_for_idle()
+    juju.wait(
+        lambda status: jubilant.all_active(status, PRINCIPAL_APP_NAME),
+        timeout=600,
+    )
+
+    yield juju
+
+    juju.remove_application(APP_NAME, force=True)
+    juju.remove_application(PRINCIPAL_APP_NAME, force=True)
 
 
-@pytest.mark.abort_on_fail
-async def test_metrics(ops_test: OpsTest):
-    assert ops_test.model
-    unit = ops_test.model.applications["script-exporter"].units[0]
-    try:
-        metrics = await unit.ssh("curl localhost:9469/probe?script=hello")
-        assert 'hello_world{param="argument"} 1' in metrics
-    except JujuError as e:
-        pytest.fail(f"Failed to collect metrics from the script-exporter: {e.message}")
+def test_metrics(deployed_charm: jubilant.Juju):
+    """Test that metrics are available from the script-exporter."""
+    juju = deployed_charm
+    task = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=hello")
+    metrics = task.stdout
+    assert 'hello_world{param="argument"} 1' in metrics, f"Expected metric not found in: {metrics}"
