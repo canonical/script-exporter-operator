@@ -34,7 +34,7 @@ def deployed_charm(juju: jubilant.Juju, charm: str):
     )
 
     juju.wait(
-        lambda status: jubilant.all_active(status, PRINCIPAL_APP_NAME),
+        lambda status: jubilant.all_active(status, PRINCIPAL_APP_NAME, APP_NAME),
         timeout=600,
     )
 
