@@ -63,22 +63,19 @@ def deployed_charm(juju: jubilant.Juju, charm: str):
 def test_metrics_hello(deployed_charm: jubilant.Juju):
     """Test hello script metrics."""
     juju = deployed_charm
-    task = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=hello")
-    metrics = task.stdout
+    metrics = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=hello")
     assert 'hello_world{param="diego"} 1' in metrics, f"Expected metric not found in: {metrics}"
 
 
 def test_metrics_bye(deployed_charm: jubilant.Juju):
     """Test bye script metrics."""
     juju = deployed_charm
-    task = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=bye")
-    metrics = task.stdout
+    metrics = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=bye")
     assert 'bye_world{param="maradona"} 1' in metrics, f"Expected metric not found in: {metrics}"
 
 
 def test_metrics_abspath(deployed_charm: jubilant.Juju):
     """Test abspath script metrics."""
     juju = deployed_charm
-    task = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=abspath")
-    metrics = task.stdout
+    metrics = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=abspath")
     assert 'champion{param="me"} 1' in metrics, f"Expected metric not found in: {metrics}"

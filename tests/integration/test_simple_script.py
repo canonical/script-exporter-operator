@@ -47,6 +47,5 @@ def deployed_charm(juju: jubilant.Juju, charm: str):
 def test_metrics(deployed_charm: jubilant.Juju):
     """Test that metrics are available from the script-exporter."""
     juju = deployed_charm
-    task = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=hello")
-    metrics = task.stdout
+    metrics = juju.ssh(f"{APP_NAME}/0", "curl -s localhost:9469/probe?script=hello")
     assert 'hello_world{param="argument"} 1' in metrics, f"Expected metric not found in: {metrics}"
