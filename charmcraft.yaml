@@ -70,6 +70,11 @@ requires:
       `juju-info` provides basic compatibility with all charms.
       If all you want is /var/log logs and node_exporter metrics,
       this relation will be enough.
+  receive-ca-cert:
+    interface: certificate_transfer
+    optional: true
+    description: |
+      Receive CA certificates for TLS validation of the tracing endpoint.
 
 config:
   options:
