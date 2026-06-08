@@ -56,18 +56,21 @@ def deployed_with_tracing(juju: Juju, charm: str):
         successes=3,
     )
 
-    # Deploy opentelemetry-collector
+    # Deploy opentelemetry-collector (also a subordinate, needs principal)
     config = {
         "tracing_sampling_rate_workload": 100,
         "debug_exporter_for_traces": True,
     }
     juju.deploy(OTEL_COLLECTOR_APP_NAME, channel="dev/edge", base=APP_BASE, config=config)
+
+    # Integrate otel-collector with the principal so both subordinates are on the same machine
+    juju.integrate(OTEL_COLLECTOR_APP_NAME, PRINCIPAL_APP_NAME)
     juju.wait(
         lambda status: jubilant.all_agents_idle(status, OTEL_COLLECTOR_APP_NAME),
         timeout=10 * 60,
     )
 
-    # Integrate with cos-agent
+    # Integrate script-exporter with otel-collector via cos-agent
     juju.integrate(
         APP_NAME + ":cos-agent",
         OTEL_COLLECTOR_APP_NAME + ":cos-agent",
