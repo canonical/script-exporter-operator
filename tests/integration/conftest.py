@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import os
 import platform
+import re
 from pathlib import Path
 
 import jubilant
@@ -92,6 +93,7 @@ def juju():
 def charm():
     """Charm used for integration testing."""
     if charm_path := os.getenv("CHARM_PATH"):
+        charm_path = re.sub(r"ubuntu@\d+\.\d+", APP_BASE, charm_path)
         logger.info("using charm from env: %s", charm_path)
         return charm_path
 
